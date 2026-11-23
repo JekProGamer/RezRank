@@ -1,0 +1,17 @@
+{
+  "Database": {
+    "Enabled": true,
+    "Host": "127.0.0.1",
+    "Port": 3306,
+    "Database": "rezrank",
+    "Username": "root",
+    "Password": "CHANGE_ME",
+    "SslMode": "Preferred"
+  },
+  "DatabaseCleanup": {
+    "Enabled": true,
+    "InactiveDays": 4,
+    "CheckIntervalHours": 24,
+    "ExcludeBypassPlayers": true
+  }
+}
