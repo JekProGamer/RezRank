@@ -5,6 +5,7 @@ namespace RezRank.Database;
 
 public readonly record struct KillXpResult(long PreviousXp, long CurrentXp);
 public readonly record struct AchievementStats(int DoubleKills, int TripleKills, int QuadKills, int Aces);
+public sealed record AchievementLeaderboardEntry(string SteamId, string PlayerName, int DoubleKills, int TripleKills, int QuadKills, int Aces, int Total);
 
 public sealed class RezRankDatabase
 {
@@ -274,6 +275,47 @@ public sealed class RezRankDatabase
 
         await transaction.CommitAsync(cancellationToken);
         return new KillXpResult(previousXp, previousXp + xpReward);
+    }
+
+    public async Task<List<AchievementLeaderboardEntry>> GetTopAchievementPlayersAsync(
+        int limit = 5,
+        CancellationToken cancellationToken = default)
+    {
+        if (limit < 1)
+            throw new ArgumentOutOfRangeException(nameof(limit));
+
+        const string sql = """
+            SELECT p.steam_id, p.last_known_name,
+                   a.double_kills, a.triple_kills, a.quad_kills, a.aces,
+                   (a.double_kills + a.triple_kills + a.quad_kills + a.aces) AS total
+            FROM rezrank_achievements a
+            INNER JOIN rezrank_players p ON p.steam_id = a.steam_id
+            WHERE (a.double_kills + a.triple_kills + a.quad_kills + a.aces) > 0
+            ORDER BY total DESC, a.aces DESC, a.quad_kills DESC,
+                     a.triple_kills DESC, a.double_kills DESC, p.last_known_name ASC
+            LIMIT @limit;
+            """;
+
+        var players = new List<AchievementLeaderboardEntry>();
+        await using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@limit", limit);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            players.Add(new AchievementLeaderboardEntry(
+                reader.GetString(reader.GetOrdinal("steam_id")),
+                reader.GetString(reader.GetOrdinal("last_known_name")),
+                reader.GetInt32(reader.GetOrdinal("double_kills")),
+                reader.GetInt32(reader.GetOrdinal("triple_kills")),
+                reader.GetInt32(reader.GetOrdinal("quad_kills")),
+                reader.GetInt32(reader.GetOrdinal("aces")),
+                reader.GetInt32(reader.GetOrdinal("total"))));
+        }
+
+        return players;
     }
 
     public async Task RecordDeathAsync(
