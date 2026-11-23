@@ -54,12 +54,12 @@ public sealed class RezRankDatabase
 
         return new PlayerRecord
         {
-            SteamId = reader.GetString("steam_id"),
-            LastKnownName = reader.GetString("last_known_name"),
-            Xp = reader.GetInt64("xp"),
-            Kills = reader.GetInt32("kills"),
-            Deaths = reader.GetInt32("deaths"),
-            LastActivity = reader.GetDateTime("last_activity")
+            SteamId = reader.GetString(reader.GetOrdinal("steam_id")),
+            LastKnownName = reader.GetString(reader.GetOrdinal("last_known_name")),
+            Xp = reader.GetInt64(reader.GetOrdinal("xp")),
+            Kills = reader.GetInt32(reader.GetOrdinal("kills")),
+            Deaths = reader.GetInt32(reader.GetOrdinal("deaths")),
+            LastActivity = reader.GetDateTime(reader.GetOrdinal("last_activity"))
         };
     }
 
