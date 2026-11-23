@@ -606,7 +606,7 @@ public sealed class RezRankPlugin : BasePlugin
             if (attackerIsBypass)
                 return;
 
-            if (!string.IsNullOrWhiteSpace(achievementName) && achievementXp > 0)
+            if (!string.IsNullOrWhiteSpace(achievementName))
             {
                 Server.NextFrame(() =>
                 {
