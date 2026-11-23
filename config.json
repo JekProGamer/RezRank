@@ -14,6 +14,12 @@
     "CheckIntervalHours": 24,
     "ExcludeBypassPlayers": true
   },
+  "Bypass": {
+    "Enabled": true,
+    "RankName": "BYPASS",
+    "ImagePath": "materials/rezrank/bypass.png",
+    "SteamIds": []
+  },
   "RankProgression": {
     "XpPerKill": 10,
     "Ranks": [
