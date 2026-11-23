@@ -35,6 +35,13 @@ public sealed class RezRankPlugin : BasePlugin
                 return;
             }
 
+            _config.Bypass.SteamIds ??= new List<string>();
+            _config.Bypass.SteamIds = _config.Bypass.SteamIds
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(id => id.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
             if (_config.RankProgression.XpPerKill < 0)
                 throw new InvalidOperationException("RankProgression.XpPerKill cannot be negative.");
 
@@ -87,6 +94,8 @@ public sealed class RezRankPlugin : BasePlugin
 
                 var attackerSteamId = hasValidEnemyAttacker ? attacker!.SteamID.ToString() : string.Empty;
                 var attackerName = hasValidEnemyAttacker ? attacker!.PlayerName : string.Empty;
+                var attackerIsBypass = hasValidEnemyAttacker && IsBypass(attackerSteamId);
+                var victimIsBypass = IsBypass(victimSteamId);
 
                 // Defer processing by one frame so player_disconnect can mark
                 // the SteamID first if the engine emits both events on exit.
@@ -113,6 +122,8 @@ public sealed class RezRankPlugin : BasePlugin
                         attackerName,
                         victimSteamId,
                         victimName,
+                        victimIsBypass ? 20 : _config!.RankProgression.XpPerKill,
+                        attackerIsBypass,
                         cancellationToken);
                 });
 
@@ -163,6 +174,8 @@ public sealed class RezRankPlugin : BasePlugin
         string attackerName,
         string victimSteamId,
         string victimName,
+        int xpReward,
+        bool attackerIsBypass,
         CancellationToken cancellationToken)
     {
         try
@@ -176,8 +189,11 @@ public sealed class RezRankPlugin : BasePlugin
                 attackerName,
                 victimSteamId,
                 victimName,
-                _config.RankProgression.XpPerKill,
+                attackerIsBypass ? 0 : xpReward,
                 cancellationToken);
+
+            if (attackerIsBypass)
+                return;
 
             var oldRank = GetRank(result.PreviousXp);
             var newRank = GetRank(result.CurrentXp);
@@ -229,6 +245,12 @@ public sealed class RezRankPlugin : BasePlugin
         {
             Logger.LogError(exception, "RezRank: failed to record death for {PlayerName} ({SteamId}).", victimName, victimSteamId);
         }
+    }
+
+    private bool IsBypass(string steamId)
+    {
+        return _config?.Bypass.Enabled == true &&
+               _config.Bypass.SteamIds.Contains(steamId, StringComparer.Ordinal);
     }
 
     private RankDefinition GetRank(long xp)
