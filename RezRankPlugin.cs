@@ -5,6 +5,7 @@ using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Admin;
 using CounterStrikeSharp.API.Modules.Utils;
+using CounterStrikeSharp.API.Modules.UserMessages;
 using Microsoft.Extensions.Logging;
 using RezRank.Configuration;
 using RezRank.Database;
@@ -802,12 +803,23 @@ public sealed class RezRankPlugin : BasePlugin
                     .Count() - 1;
 
             rankIndex = Math.Clamp(rankIndex, 0, 17);
-            player.CompetitiveWins = 10;
-            player.CompetitiveRankType = 11;
-            player.CompetitiveRanking = 19 + rankIndex;
-            Utilities.SetStateChanged(player, "CCSPlayerController", "m_iCompetitiveWins");
-            Utilities.SetStateChanged(player, "CCSPlayerController", "m_iCompetitiveRankType");
-            Utilities.SetStateChanged(player, "CCSPlayerController", "m_iCompetitiveRanking");
+
+            // Matchmaking skillgroup type (12) supports custom skillgroup IDs.
+            // FakeRank uses UserMessage 350 to force the updated badge to clients.
+            const sbyte matchmakingRankType = 12;
+            var competitiveRanking = 19 + rankIndex;
+
+            if (player.CompetitiveRankType == matchmakingRankType &&
+                player.CompetitiveRanking == competitiveRanking)
+                return;
+
+            player.CompetitiveWins = 777;
+            player.CompetitiveRankType = matchmakingRankType;
+            player.CompetitiveRanking = competitiveRanking;
+
+            var recipients = new RecipientFilter();
+            recipients.Add(player);
+            UserMessage.FromId(350).Send(recipients);
         });
     }
 
