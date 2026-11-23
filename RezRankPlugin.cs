@@ -22,6 +22,7 @@ public sealed class RezRankPlugin : BasePlugin
     private Task _databaseReadyTask = Task.CompletedTask;
     private readonly HashSet<string> _disconnectingPlayers = new(StringComparer.Ordinal);
     private readonly Dictionary<int, RezRankMenuState> _rankMenus = new();
+    private readonly Dictionary<string, int> _killStreaks = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, PlayerButtons> RankMenuButtons = new(StringComparer.OrdinalIgnoreCase)
     {
         ["W"] = PlayerButtons.Forward,
@@ -138,6 +139,10 @@ public sealed class RezRankPlugin : BasePlugin
                         return;
                     }
 
+                    // Any real death ends the victim's current kill streak,
+                    // including suicides and world deaths.
+                    _killStreaks[victimSteamId] = 0;
+
                     if (!hasValidEnemyAttacker)
                     {
                         // World damage, falls, suicides, disconnects, bots and
@@ -145,13 +150,32 @@ public sealed class RezRankPlugin : BasePlugin
                         return;
                     }
 
+                    string? achievementName = null;
+                    var achievementXp = 0;
+                    if (_config!.Achievements.Enabled && !attackerIsBypass)
+                    {
+                        var streak = _killStreaks.GetValueOrDefault(attackerSteamId) + 1;
+                        _killStreaks[attackerSteamId] = streak;
+
+                        (achievementName, achievementXp) = streak switch
+                        {
+                            2 => ("Double Kill", _config.Achievements.DoubleKillXp),
+                            3 => ("Triple Kill", _config.Achievements.TripleKillXp),
+                            4 => ("Quad Kill", _config.Achievements.QuadKillXp),
+                            5 => ("Ace", _config.Achievements.AceXp),
+                            _ => (null, 0)
+                        };
+                    }
+
                     _ = ProcessKillAsync(
                         attackerSteamId,
                         attackerName,
                         victimSteamId,
                         victimName,
-                        victimIsBypass ? 20 : _config!.RankProgression.XpPerKill,
+                        victimIsBypass ? 20 : _config.RankProgression.XpPerKill,
                         attackerIsBypass,
+                        achievementName,
+                        achievementXp,
                         cancellationToken);
                 });
 
@@ -553,6 +577,8 @@ public sealed class RezRankPlugin : BasePlugin
         string victimName,
         int xpReward,
         bool attackerIsBypass,
+        string? achievementName,
+        int achievementXp,
         CancellationToken cancellationToken)
     {
         try
@@ -566,11 +592,26 @@ public sealed class RezRankPlugin : BasePlugin
                 attackerName,
                 victimSteamId,
                 victimName,
-                attackerIsBypass ? 0 : xpReward,
+                attackerIsBypass ? 0 : checked(xpReward + achievementXp),
                 cancellationToken);
 
             if (attackerIsBypass)
                 return;
+
+            if (!string.IsNullOrWhiteSpace(achievementName) && achievementXp > 0)
+            {
+                Server.NextFrame(() =>
+                {
+                    var player = Utilities.GetPlayers().FirstOrDefault(candidate =>
+                        candidate.IsValid &&
+                        !candidate.IsBot &&
+                        candidate.SteamID.ToString() == attackerSteamId);
+                    player?.PrintToChat(FormatChat(
+                        _config!.Achievements.Message,
+                        ("%ACHIEVEMENT%", achievementName),
+                        ("%XP%", achievementXp.ToString())));
+                });
+            }
 
             var oldRank = GetRank(result.PreviousXp);
             var newRank = GetRank(result.CurrentXp);
