@@ -340,7 +340,7 @@ public sealed class RezRankPlugin : BasePlugin
                 if (!includeStats)
                 {
                     player.PrintToChat(FormatChat("{SILVER}####################"));
-                player.PrintToChat(FormatChat("{SILVER}       МОЙ РАНГ"));
+                player.PrintToChat(FormatChat("{ORANGE}       МОЙ РАНГ"));
                 player.PrintToChat(FormatChat("{SILVER}####################"));
                 player.PrintToChat(FormatChat(_config.ChatMessages.YourRank, ("%RANK%", rank), ("%XP%", record.Xp.ToString())));
                 player.PrintToChat(FormatChat("{SILVER}####################"));
@@ -357,7 +357,7 @@ public sealed class RezRankPlugin : BasePlugin
                     : ((double)record.Kills / record.Deaths).ToString("0.00");
 
                 player.PrintToChat(FormatChat("{SILVER}####################"));
-                player.PrintToChat(FormatChat("{SILVER}     СТАТУС ИГРОКА"));
+                player.PrintToChat(FormatChat("{ORANGE}     СТАТУС ИГРОКА"));
                 player.PrintToChat(FormatChat("{SILVER}####################"));
                 player.PrintToChat(FormatChat(_config.ChatMessages.PlayerStatus, ("%RANK%", rank), ("%XP%", record.Xp.ToString())));
                 player.PrintToChat(FormatChat(_config.ChatMessages.PlayerStats,
@@ -415,7 +415,7 @@ public sealed class RezRankPlugin : BasePlugin
 
                 var rank = IsBypass(steamId) ? _config.Bypass.RankName : GetRank(record.Xp).Name;
                 player.PrintToChat(FormatChat("{SILVER}####################"));
-                player.PrintToChat(FormatChat("{SILVER}     СЛЕДУЮЩИЙ РАНГ"));
+                player.PrintToChat(FormatChat("{ORANGE}     СЛЕДУЮЩИЙ РАНГ"));
                 player.PrintToChat(FormatChat("{SILVER}####################"));
                 player.PrintToChat(FormatChat(
                     _config.ChatMessages.PlayerStatus,
@@ -481,7 +481,7 @@ public sealed class RezRankPlugin : BasePlugin
                 }
 
                 player.PrintToChat(FormatChat("{SILVER}####################"));
-                player.PrintToChat(FormatChat("{ORANGE}       TOP 10 REZRANK"));
+                player.PrintToChat(FormatChat("{GOLD}       TOP 10 REZRANK"));
                 player.PrintToChat(FormatChat("{SILVER}####################"));
 
                 for (var index = 0; index < topPlayers.Count; index++)
