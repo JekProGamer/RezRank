@@ -320,7 +320,7 @@ public sealed class RezRankPlugin : BasePlugin
 
                 if (record == null)
                 {
-                    player.PrintToChat("[RezRank] Статистика пока не найдена. Сыграйте немного, чтобы создать запись.");
+                    player.PrintToChat(FormatChat(_config.ChatMessages.NoData));
                     return;
                 }
 
@@ -329,7 +329,7 @@ public sealed class RezRankPlugin : BasePlugin
 
                 if (!includeStats)
                 {
-                    player.PrintToChat($"[RezRank] Ваш ранг: {rank} | XP: {record.Xp}");
+                    player.PrintToChat(FormatChat(_config.ChatMessages.YourRank, ("%RANK%", rank), ("%XP%", record.Xp.ToString())));
                     return;
                 }
 
@@ -346,9 +346,18 @@ public sealed class RezRankPlugin : BasePlugin
                     ? record.Kills.ToString()
                     : ((double)record.Kills / record.Deaths).ToString("0.00");
 
-                player.PrintToChat($"[RezRank] Статус: {rank} | XP: {record.Xp}");
-                player.PrintToChat($"[RezRank] Убийства: {record.Kills} | Смерти: {record.Deaths} | K/D: {kd}");
-                player.PrintToChat($"[RezRank] {progressText}");
+                player.PrintToChat(FormatChat(_config.ChatMessages.PlayerStatus, ("%RANK%", rank), ("%XP%", record.Xp.ToString())));
+                player.PrintToChat(FormatChat(_config.ChatMessages.PlayerStats,
+                    ("%KILLS%", record.Kills.ToString()),
+                    ("%DEATHS%", record.Deaths.ToString()),
+                    ("%KD%", kd)));
+
+                if (nextRank == null)
+                    player.PrintToChat(FormatChat(_config.ChatMessages.MaxRank));
+                else
+                    player.PrintToChat(FormatChat(_config.ChatMessages.NextRank,
+                        ("%NEXT_RANK%", nextRank.Name),
+                        ("%XP_LEFT%", (nextRank.MinXp - record.Xp).ToString())));
             });
         }
         catch (OperationCanceledException)
@@ -361,7 +370,7 @@ public sealed class RezRankPlugin : BasePlugin
             Server.NextFrame(() =>
             {
                 if (player.IsValid)
-                    player.PrintToChat("[RezRank] Не удалось получить статус. Попробуйте позже.");
+                    player.PrintToChat(FormatChat(_config?.ChatMessages.Error ?? "{RED}Не удалось получить статус."));
             });
         }
     }
@@ -422,7 +431,7 @@ public sealed class RezRankPlugin : BasePlugin
             if (!string.Equals(oldRank.Name, newRank.Name, StringComparison.Ordinal))
             {
                 Server.NextFrame(() => Server.PrintToChatAll(
-                    $"[RezRank] {attackerName} получил звание {newRank.Name}!"));
+                    FormatChat(_config.ChatMessages.RankUp, ("%PLAYER%", attackerName), ("%RANK%", newRank.Name))));
                 Logger.LogInformation(
                     "RezRank: {PlayerName} ranked up from {OldRank} to {NewRank} ({Xp} XP).",
                     attackerName,
@@ -466,6 +475,14 @@ public sealed class RezRankPlugin : BasePlugin
         {
             Logger.LogError(exception, "RezRank: failed to record death for {PlayerName} ({SteamId}).", victimName, victimSteamId);
         }
+    }
+
+
+    private static string FormatChat(string template, params (string Token, string Value)[] replacements)
+    {
+        foreach (var (token, value) in replacements)
+            template = template.Replace(token, value, StringComparison.Ordinal);
+        return template;
     }
 
     private bool IsBypass(string steamId)
