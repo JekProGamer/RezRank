@@ -101,19 +101,19 @@ public sealed class RezRankPlugin : BasePlugin
                         return;
                     }
 
-                    if (hasValidEnemyAttacker)
+                    if (!hasValidEnemyAttacker)
                     {
-                        _ = ProcessKillAsync(
-                            attackerSteamId,
-                            attackerName,
-                            victimSteamId,
-                            victimName,
-                            cancellationToken);
+                        // World damage, falls, suicides, disconnects, bots and
+                        // non-enemy deaths do not affect player rank statistics.
+                        return;
                     }
-                    else
-                    {
-                        _ = RecordDeathAsync(victimSteamId, victimName, cancellationToken);
-                    }
+
+                    _ = ProcessKillAsync(
+                        attackerSteamId,
+                        attackerName,
+                        victimSteamId,
+                        victimName,
+                        cancellationToken);
                 });
 
                 return HookResult.Continue;
