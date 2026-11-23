@@ -93,7 +93,7 @@ public sealed class RezRankPlugin : BasePlugin
                 var playerName = player.PlayerName;
                 _disconnectingPlayers.Remove(steamId);
                 _ = SavePlayerActivityAsync(steamId, playerName, cancellationToken);
-                _ = RefreshTabRankAfterConnectAsync(steamId, cancellationToken);
+                _ = RefreshTabRankAfterConnectAsync(steamId, playerName, cancellationToken);
 
                 return HookResult.Continue;
             });
@@ -761,7 +761,7 @@ public sealed class RezRankPlugin : BasePlugin
     }
 
 
-    private async Task RefreshTabRankAfterConnectAsync(string steamId, CancellationToken cancellationToken)
+    private async Task RefreshTabRankAfterConnectAsync(string steamId, string playerName, CancellationToken cancellationToken)
     {
         try
         {
@@ -770,9 +770,7 @@ public sealed class RezRankPlugin : BasePlugin
 
             await _databaseReadyTask;
             // Wait for the activity upsert so a first-time player has a database row.
-            await _database.UpsertPlayerActivityAsync(steamId,
-                Utilities.GetPlayers().FirstOrDefault(p => p.IsValid && p.SteamID.ToString() == steamId)?.PlayerName ?? string.Empty,
-                cancellationToken);
+            await _database.UpsertPlayerActivityAsync(steamId, playerName, cancellationToken);
             var record = await _database.GetPlayerAsync(steamId, cancellationToken);
             UpdateOnlineTabRank(steamId, record?.Xp ?? 0);
         }
