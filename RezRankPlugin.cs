@@ -2,6 +2,7 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Commands;
+using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Logging;
 using RezRank.Configuration;
 using RezRank.Database;
@@ -478,7 +479,32 @@ public sealed class RezRankPlugin : BasePlugin
     {
         foreach (var (token, value) in replacements)
             template = template.Replace(token, value, StringComparison.Ordinal);
-        return template;
+
+        // PrintToChat does not parse {COLOR} text tags. Convert them to the
+        // control characters understood by CounterStrikeSharp's chat renderer.
+        return template
+            .Replace("{DEFAULT}", ChatColors.Default.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{WHITE}", ChatColors.White.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{SILVER}", ChatColors.Silver.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{ORANGE}", ChatColors.Orange.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{GOLD}", ChatColors.Gold.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{RED}", ChatColors.Red.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{DARKRED}", ChatColors.DarkRed.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{LIGHTRED}", ChatColors.LightRed.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{BLUE}", ChatColors.Blue.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{LIGHTBLUE}", ChatColors.LightBlue.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{DARKBLUE}", ChatColors.DarkBlue.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{GREEN}", ChatColors.Green.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{LIME}", ChatColors.Lime.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{YELLOW}", ChatColors.Yellow.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{LIGHTYELLOW}", ChatColors.LightYellow.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{PURPLE}", ChatColors.Purple.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{MAGENTA}", ChatColors.Magenta.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{LIGHTPURPLE}", ChatColors.LightPurple.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{GREY}", ChatColors.Grey.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{GRAY}", ChatColors.Grey.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{OLIVE}", ChatColors.Olive.ToString(), StringComparison.OrdinalIgnoreCase)
+            .Replace("{BLUEGREY}", ChatColors.BlueGrey.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
     private bool IsBypass(string steamId)
