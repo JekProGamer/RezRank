@@ -25,24 +25,88 @@
   "RankProgression": {
     "XpPerKill": 10,
     "Ranks": [
-      { "Name": "Silver I", "MinXp": 0 },
-      { "Name": "Silver II", "MinXp": 100 },
-      { "Name": "Silver III", "MinXp": 250 },
-      { "Name": "Silver IV", "MinXp": 450 },
-      { "Name": "Silver Elite", "MinXp": 700 },
-      { "Name": "Silver Elite Master", "MinXp": 1000 },
-      { "Name": "Gold Nova I", "MinXp": 1400 },
-      { "Name": "Gold Nova II", "MinXp": 1900 },
-      { "Name": "Gold Nova III", "MinXp": 2500 },
-      { "Name": "Gold Nova Master", "MinXp": 3200 },
-      { "Name": "Master Guardian I", "MinXp": 4000 },
-      { "Name": "Master Guardian II", "MinXp": 5000 },
-      { "Name": "Master Guardian Elite", "MinXp": 6200 },
-      { "Name": "Distinguished Master Guardian", "MinXp": 7600 },
-      { "Name": "Legendary Eagle", "MinXp": 9200 },
-      { "Name": "Legendary Eagle Master", "MinXp": 11000 },
-      { "Name": "Supreme Master First Class", "MinXp": 13000 },
-      { "Name": "The Global Elite", "MinXp": 15500 }
+      {
+        "Name": "Silver I",
+        "MinXp": 0
+      },
+      {
+        "Name": "Silver II",
+        "MinXp": 100
+      },
+      {
+        "Name": "Silver III",
+        "MinXp": 250
+      },
+      {
+        "Name": "Silver IV",
+        "MinXp": 450
+      },
+      {
+        "Name": "Silver Elite",
+        "MinXp": 700
+      },
+      {
+        "Name": "Silver Elite Master",
+        "MinXp": 1000
+      },
+      {
+        "Name": "Gold Nova I",
+        "MinXp": 1400
+      },
+      {
+        "Name": "Gold Nova II",
+        "MinXp": 1900
+      },
+      {
+        "Name": "Gold Nova III",
+        "MinXp": 2500
+      },
+      {
+        "Name": "Gold Nova Master",
+        "MinXp": 3200
+      },
+      {
+        "Name": "Master Guardian I",
+        "MinXp": 4000
+      },
+      {
+        "Name": "Master Guardian II",
+        "MinXp": 5000
+      },
+      {
+        "Name": "Master Guardian Elite",
+        "MinXp": 6200
+      },
+      {
+        "Name": "Distinguished Master Guardian",
+        "MinXp": 7600
+      },
+      {
+        "Name": "Legendary Eagle",
+        "MinXp": 9200
+      },
+      {
+        "Name": "Legendary Eagle Master",
+        "MinXp": 11000
+      },
+      {
+        "Name": "Supreme Master First Class",
+        "MinXp": 13000
+      },
+      {
+        "Name": "The Global Elite",
+        "MinXp": 15500
+      }
     ]
+  },
+  "ChatMessages": {
+    "YourRank": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}Ваш ранг: {BLUE}%RANK% {SILVER}| {YELLOW}XP: {GREEN}%XP%",
+    "PlayerStatus": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}Статус: {BLUE}%RANK% {SILVER}| {YELLOW}XP: {GREEN}%XP%",
+    "PlayerStats": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}Убийства: {GREEN}%KILLS% {SILVER}| {WHITE}Смерти: {RED}%DEATHS% {SILVER}| {WHITE}K/D: {YELLOW}%KD%",
+    "NextRank": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}До {BLUE}%NEXT_RANK%: {GREEN}%XP_LEFT% XP",
+    "MaxRank": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {GREEN}У вас максимальный ранг!",
+    "RankUp": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}%PLAYER% получил звание {BLUE}%RANK%{WHITE}!",
+    "NoData": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}Статистика пока не найдена. Сыграйте немного, чтобы создать запись.",
+    "Error": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {RED}Не удалось получить статус. Попробуйте позже."
   }
 }
