@@ -8,6 +8,7 @@ public sealed class RezRankConfig
     public DatabaseCleanupConfig DatabaseCleanup { get; set; } = new();
     public RankProgressionConfig RankProgression { get; set; } = new();
     public BypassConfig Bypass { get; set; } = new();
+    public ChatMessagesConfig ChatMessages { get; set; } = new();
 
     public static RezRankConfig Load(string path)
     {
@@ -100,4 +101,17 @@ public sealed class RankDefinition
 {
     public string Name { get; set; } = "Silver I";
     public long MinXp { get; set; }
+}
+
+
+public sealed class ChatMessagesConfig
+{
+    public string YourRank { get; set; } = "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}Ваш ранг: {BLUE}%RANK% {SILVER}| {YELLOW}XP: {GREEN}%XP%";
+    public string PlayerStatus { get; set; } = "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}Статус: {BLUE}%RANK% {SILVER}| {YELLOW}XP: {GREEN}%XP%";
+    public string PlayerStats { get; set; } = "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}Убийства: {GREEN}%KILLS% {SILVER}| {WHITE}Смерти: {RED}%DEATHS% {SILVER}| {WHITE}K/D: {YELLOW}%KD%";
+    public string NextRank { get; set; } = "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}До {BLUE}%NEXT_RANK%: {GREEN}%XP_LEFT% XP";
+    public string MaxRank { get; set; } = "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {GREEN}У вас максимальный ранг!";
+    public string RankUp { get; set; } = "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}%PLAYER% получил звание {BLUE}%RANK%{WHITE}!";
+    public string NoData { get; set; } = "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}Статистика пока не найдена. Сыграйте немного, чтобы создать запись.";
+    public string Error { get; set; } = "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {RED}Не удалось получить статус. Попробуйте позже.";
 }
