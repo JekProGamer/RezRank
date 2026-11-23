@@ -45,8 +45,16 @@ public sealed class RezRankPlugin : BasePlugin
             if (_config.RankProgression.XpPerKill < 0)
                 throw new InvalidOperationException("RankProgression.XpPerKill cannot be negative.");
 
+            if (_config.DatabaseCleanup.CheckIntervalHours < 1)
+                throw new InvalidOperationException("DatabaseCleanup.CheckIntervalHours must be at least 1.");
+            if (_config.DatabaseCleanup.InactiveDays < 1)
+                throw new InvalidOperationException("DatabaseCleanup.InactiveDays must be at least 1.");
+
             _database = new RezRankDatabase(_config.Database);
             _databaseReadyTask = InitializeDatabaseAsync(cancellationToken);
+
+            if (_config.DatabaseCleanup.Enabled)
+                _ = RunDatabaseCleanupLoopAsync(cancellationToken);
 
             RegisterEventHandler<EventPlayerConnectFull>((@event, info) =>
             {
@@ -264,6 +272,50 @@ public sealed class RezRankPlugin : BasePlugin
             .OrderBy(rank => rank.MinXp)
             .LastOrDefault()
             ?? ranks.OrderBy(rank => rank.MinXp).First();
+    }
+
+    private async Task RunDatabaseCleanupLoopAsync(CancellationToken cancellationToken)
+    {
+        if (_config == null || _database == null)
+            return;
+
+        var interval = TimeSpan.FromHours(_config.DatabaseCleanup.CheckIntervalHours);
+        var inactiveDays = _config.DatabaseCleanup.InactiveDays;
+        var excludedSteamIds = _config.DatabaseCleanup.ExcludeBypassPlayers && _config.Bypass.Enabled
+            ? _config.Bypass.SteamIds
+            : new List<string>();
+
+        Logger.LogInformation(
+            "RezRank: inactive-player cleanup scheduled every {IntervalHours} hours; retention: {InactiveDays} days.",
+            _config.DatabaseCleanup.CheckIntervalHours,
+            inactiveDays);
+
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                await Task.Delay(interval, cancellationToken);
+                await _databaseReadyTask;
+
+                var deletedCount = await _database.DeleteInactivePlayersAsync(
+                    inactiveDays,
+                    excludedSteamIds,
+                    cancellationToken);
+
+                Logger.LogInformation(
+                    "RezRank: daily inactive-player cleanup completed. Deleted {DeletedCount} player(s); Bypass exclusions: {BypassCount}.",
+                    deletedCount,
+                    excludedSteamIds.Count);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Plugin is unloading.
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "RezRank: inactive-player cleanup failed.");
+        }
     }
 
     private async Task InitializeDatabaseAsync(CancellationToken cancellationToken)
