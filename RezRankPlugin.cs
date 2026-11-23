@@ -93,6 +93,7 @@ public sealed class RezRankPlugin : BasePlugin
                 var playerName = player.PlayerName;
                 _disconnectingPlayers.Remove(steamId);
                 _ = SavePlayerActivityAsync(steamId, playerName, cancellationToken);
+                _ = RefreshTabRankAfterConnectAsync(steamId, cancellationToken);
 
                 return HookResult.Continue;
             });
@@ -759,6 +760,60 @@ public sealed class RezRankPlugin : BasePlugin
         }
     }
 
+
+    private async Task RefreshTabRankAfterConnectAsync(string steamId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (_database == null)
+                return;
+
+            await _databaseReadyTask;
+            // Wait for the activity upsert so a first-time player has a database row.
+            await _database.UpsertPlayerActivityAsync(steamId,
+                Utilities.GetPlayers().FirstOrDefault(p => p.IsValid && p.SteamID.ToString() == steamId)?.PlayerName ?? string.Empty,
+                cancellationToken);
+            var record = await _database.GetPlayerAsync(steamId, cancellationToken);
+            UpdateOnlineTabRank(steamId, record?.Xp ?? 0);
+        }
+        catch (OperationCanceledException)
+        {
+            // Plugin is unloading.
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "RezRank: failed to load TAB rank for {SteamId}.", steamId);
+        }
+    }
+
+    private void UpdateOnlineTabRank(string steamId, long xp)
+    {
+        Server.NextFrame(() =>
+        {
+            var player = Utilities.GetPlayers().FirstOrDefault(candidate =>
+                candidate.IsValid && !candidate.IsBot && !candidate.IsHLTV &&
+                candidate.SteamID.ToString() == steamId);
+            if (player == null)
+                return;
+
+            var rankIndex = IsBypass(steamId)
+                ? 17
+                : _config!.RankProgression.Ranks
+                    .Where(rank => rank != null)
+                    .OrderBy(rank => rank.MinXp)
+                    .TakeWhile(rank => rank.MinXp <= xp)
+                    .Count() - 1;
+
+            rankIndex = Math.Clamp(rankIndex, 0, 17);
+            player.CompetitiveWins = 10;
+            player.CompetitiveRankType = 11;
+            player.CompetitiveRanking = 19 + rankIndex;
+            Utilities.SetStateChanged(player, "CCSPlayerController", "m_iCompetitiveWins");
+            Utilities.SetStateChanged(player, "CCSPlayerController", "m_iCompetitiveRankType");
+            Utilities.SetStateChanged(player, "CCSPlayerController", "m_iCompetitiveRanking");
+        });
+    }
+
     private async Task ProcessKillAsync(
         string attackerSteamId,
         string attackerName,
@@ -784,6 +839,8 @@ public sealed class RezRankPlugin : BasePlugin
                 attackerIsBypass ? 0 : checked(xpReward + achievementXp),
                 achievementName,
                 cancellationToken);
+
+            UpdateOnlineTabRank(attackerSteamId, result.CurrentXp);
 
             if (attackerIsBypass)
                 return;
@@ -1071,6 +1128,8 @@ public sealed class RezRankPlugin : BasePlugin
                 _ => throw new InvalidOperationException("Unsupported admin XP operation.")
             };
 
+            UpdateOnlineTabRank(pending.TargetSteamId, result.CurrentXp);
+
             Server.NextFrame(() =>
             {
                 if (!admin.IsValid || !IsRankAdmin(admin))
@@ -1119,6 +1178,7 @@ public sealed class RezRankPlugin : BasePlugin
 
             await _databaseReadyTask;
             await _database.ResetPlayerProgressAsync(targetSteamId, targetName, cancellationToken);
+            UpdateOnlineTabRank(targetSteamId, 0);
             Server.NextFrame(() =>
             {
                 _killStreaks.Remove(targetSteamId);
