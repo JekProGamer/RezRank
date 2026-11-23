@@ -17,7 +17,8 @@
     <Reference Include="WASDSharedAPI">
       <HintPath>lib/WASDSharedAPI.dll</HintPath>
       <Private>true</Private>
-    </Reference>\n  </ItemGroup>
+    </Reference>
+  </ItemGroup>
 
   <ItemGroup>
     <None Update="config.json" CopyToOutputDirectory="PreserveNewest" />
