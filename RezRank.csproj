@@ -19,4 +19,19 @@
   <ItemGroup>
     <None Update="config.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <!-- Put runtime dependencies in the CounterStrikeSharp shared folder layout. -->
+  <Target Name="CopyDependenciesToShared" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <ItemGroup>
+      <_RezRankSharedDependency Include="@(ReferenceCopyLocalPaths)"
+                               Condition="'%(ReferenceCopyLocalPaths.Extension)' == '.dll'
+                                          and '%(ReferenceCopyLocalPaths.Filename)' != 'CounterStrikeSharp.API'" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(_RezRankSharedDependency)"
+          DestinationFiles="@(_RezRankSharedDependency->'$(MSBuildProjectDirectory)/bin/Release/shared/%(Filename)/%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+
+    <Delete Files="@(_RezRankSharedDependency->'$(TargetDir)%(Filename)%(Extension)')" />
+  </Target>
 </Project>
