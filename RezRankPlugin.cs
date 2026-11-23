@@ -23,6 +23,7 @@ public sealed class RezRankPlugin : BasePlugin
     private readonly HashSet<string> _disconnectingPlayers = new(StringComparer.Ordinal);
     private readonly Dictionary<int, RezRankMenuState> _rankMenus = new();
     private readonly Dictionary<string, int> _killStreaks = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, HashSet<string>> _streakVictims = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, PlayerButtons> RankMenuButtons = new(StringComparer.OrdinalIgnoreCase)
     {
         ["W"] = PlayerButtons.Forward,
@@ -105,6 +106,7 @@ public sealed class RezRankPlugin : BasePlugin
                         _rankMenus.Remove(player.Slot);
 
                     _killStreaks.Remove(@event.Xuid.ToString());
+                    _streakVictims.Remove(@event.Xuid.ToString());
                 }
 
                 return HookResult.Continue;
@@ -148,8 +150,10 @@ public sealed class RezRankPlugin : BasePlugin
                     }
 
                     // Any real death ends the victim's current kill streak,
-                    // including suicides and world deaths.
-                    _killStreaks[victimSteamId] = 0;
+                    // including suicides and world deaths. Their unique-victim
+                    // history is life-scoped and must be cleared as well.
+                    _killStreaks.Remove(victimSteamId);
+                    _streakVictims.Remove(victimSteamId);
 
                     if (!hasValidEnemyAttacker)
                     {
@@ -162,17 +166,30 @@ public sealed class RezRankPlugin : BasePlugin
                     var achievementXp = 0;
                     if (_config!.Achievements.Enabled && !attackerIsBypass)
                     {
-                        var streak = _killStreaks.GetValueOrDefault(attackerSteamId) + 1;
-                        _killStreaks[attackerSteamId] = streak;
-
-                        (achievementName, achievementXp) = streak switch
+                        if (!_streakVictims.TryGetValue(attackerSteamId, out var victims))
                         {
-                            2 => ("Double Kill", _config.Achievements.DoubleKillXp),
-                            3 => ("Triple Kill", _config.Achievements.TripleKillXp),
-                            4 => ("Quad Kill", _config.Achievements.QuadKillXp),
-                            5 => ("Ace", _config.Achievements.AceXp),
-                            _ => (null, 0)
-                        };
+                            victims = new HashSet<string>(StringComparer.Ordinal);
+                            _streakVictims[attackerSteamId] = victims;
+                        }
+
+                        // Count each opponent only once during this attacker's
+                        // current life. Re-killing the same opponent still goes
+                        // through ProcessKillAsync and grants the normal kill XP,
+                        // but cannot advance or reward the achievement streak.
+                        if (victims.Add(victimSteamId))
+                        {
+                            var streak = _killStreaks.GetValueOrDefault(attackerSteamId) + 1;
+                            _killStreaks[attackerSteamId] = streak;
+
+                            (achievementName, achievementXp) = streak switch
+                            {
+                                2 => ("Double Kill", _config.Achievements.DoubleKillXp),
+                                3 => ("Triple Kill", _config.Achievements.TripleKillXp),
+                                4 => ("Quad Kill", _config.Achievements.QuadKillXp),
+                                5 => ("Ace", _config.Achievements.AceXp),
+                                _ => (null, 0)
+                            };
+                        }
                     }
 
                     _ = ProcessKillAsync(
