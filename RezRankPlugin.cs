@@ -1,3 +1,4 @@
+using System.Globalization;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
@@ -25,6 +26,7 @@ public sealed class RezRankPlugin : BasePlugin
     private readonly Dictionary<int, RezRankMenuState> _rankMenus = new();
     private readonly Dictionary<string, int> _killStreaks = new(StringComparer.Ordinal);
     private readonly Dictionary<string, HashSet<string>> _streakVictims = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, PendingAdminXpChange> _pendingAdminXp = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, PlayerButtons> RankMenuButtons = new(StringComparer.OrdinalIgnoreCase)
     {
         ["W"] = PlayerButtons.Forward,
@@ -233,6 +235,31 @@ public sealed class RezRankPlugin : BasePlugin
         _ = SendAchievementLeaderboardAsync(player, _shutdown?.Token ?? CancellationToken.None);
     }
 
+    [ConsoleCommand("css_rankamount")]
+    public void SetAdminXpAmount(CCSPlayerController? player, CommandInfo info)
+    {
+        if (player == null || !IsRankAdmin(player))
+            return;
+
+        var adminSteamId = player.SteamID.ToString();
+        if (!_pendingAdminXp.TryGetValue(adminSteamId, out var pending))
+        {
+            player.PrintToChat(FormatChat("{SILVER}[{ORANGE}RezRank{SILVER}] {YELLOW}Сначала выбери действие и игрока в меню администрации."));
+            return;
+        }
+
+        if (info.ArgCount < 2 ||
+            !long.TryParse(info.GetArg(1), NumberStyles.None, CultureInfo.InvariantCulture, out var amount) ||
+            amount < 0)
+        {
+            player.PrintToChat(FormatChat("{SILVER}[{ORANGE}RezRank{SILVER}] {YELLOW}Укажи целое неотрицательное число: !rankamount 250"));
+            return;
+        }
+
+        _pendingAdminXp.Remove(adminSteamId);
+        _ = ApplyAdminXpAmountAsync(player, pending, amount, _shutdown?.Token ?? CancellationToken.None);
+    }
+
     [ConsoleCommand("css_rank")]
     public void OpenRankMenu(CCSPlayerController? player, CommandInfo? info)
     {
@@ -281,7 +308,7 @@ public sealed class RezRankPlugin : BasePlugin
                 }
 
                 CloseRankMenu(p);
-                p.PrintToChat(FormatChat("{SILVER}[{ORANGE}RezRank{SILVER}] {YELLOW}Административный раздел будет добавлен следующим шагом."));
+                OpenAdminMenu(p);
             }, requiresAdmin: true));
         }
 
@@ -379,7 +406,7 @@ public sealed class RezRankPlugin : BasePlugin
         int end = Math.Min(total, start + visible);
 
         var html = new System.Text.StringBuilder();
-        html.Append($"<b><font color='red' class='fontSize-m'>RezRank — меню игрока</font></b> <font color='yellow' class='fontSize-sm'>{selected + 1}</font>/<font color='orange' class='fontSize-sm'>{total}</font><br>");
+        html.Append($"<b><font color='red' class='fontSize-m'>{state.Title}</font></b> <font color='yellow' class='fontSize-sm'>{selected + 1}</font>/<font color='orange' class='fontSize-sm'>{total}</font><br>");
         for (int i = start; i < end; i++)
         {
             bool isSelected = i == selected;
@@ -889,6 +916,295 @@ public sealed class RezRankPlugin : BasePlugin
             .Replace("{BLUEGREY}", ChatColors.BlueGrey.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
+    private enum AdminAction
+    {
+        AddXp,
+        RemoveXp,
+        SetXp,
+        ResetProgress,
+        PlayerInfo
+    }
+
+    private sealed record PendingAdminXpChange(
+        string TargetSteamId,
+        string TargetName,
+        AdminAction Action);
+
+    private void OpenAdminMenu(CCSPlayerController admin)
+    {
+        if (!IsRankAdmin(admin))
+        {
+            CloseRankMenu(admin);
+            return;
+        }
+
+        var state = new RezRankMenuState
+        {
+            Title = "RezRank — администрация",
+            SelectedIndex = 0,
+            OpenedAtUtc = DateTime.UtcNow,
+            LastInputUtc = DateTime.UtcNow,
+            PreviousButtons = admin.Buttons.ToString()
+        };
+
+        state.Options.Add(new RezRankMenuOption("Выдать XP", p =>
+        {
+            CloseRankMenu(p);
+            OpenAdminPlayerSelection(p, AdminAction.AddXp);
+        }, requiresAdmin: true));
+        state.Options.Add(new RezRankMenuOption("Снять XP", p =>
+        {
+            CloseRankMenu(p);
+            OpenAdminPlayerSelection(p, AdminAction.RemoveXp);
+        }, requiresAdmin: true));
+        state.Options.Add(new RezRankMenuOption("Установить XP", p =>
+        {
+            CloseRankMenu(p);
+            OpenAdminPlayerSelection(p, AdminAction.SetXp);
+        }, requiresAdmin: true));
+        state.Options.Add(new RezRankMenuOption("Сбросить прогресс", p =>
+        {
+            CloseRankMenu(p);
+            OpenAdminPlayerSelection(p, AdminAction.ResetProgress);
+        }, requiresAdmin: true));
+        state.Options.Add(new RezRankMenuOption("Информация об игроке", p =>
+        {
+            CloseRankMenu(p);
+            OpenAdminPlayerSelection(p, AdminAction.PlayerInfo);
+        }, requiresAdmin: true));
+        state.Options.Add(new RezRankMenuOption("Назад", p =>
+        {
+            CloseRankMenu(p);
+            OpenRankMenu(p, null);
+        }, requiresAdmin: true));
+
+        _rankMenus[admin.Slot] = state;
+        RenderRankMenu(admin, state);
+    }
+
+    private void OpenAdminPlayerSelection(CCSPlayerController admin, AdminAction action)
+    {
+        if (!IsRankAdmin(admin))
+        {
+            CloseRankMenu(admin);
+            return;
+        }
+
+        var state = new RezRankMenuState
+        {
+            Title = "RezRank — выбор игрока",
+            SelectedIndex = 0,
+            OpenedAtUtc = DateTime.UtcNow,
+            LastInputUtc = DateTime.UtcNow,
+            PreviousButtons = admin.Buttons.ToString()
+        };
+
+        foreach (var target in Utilities.GetPlayers()
+                     .Where(candidate => candidate.IsValid && !candidate.IsBot && !candidate.IsHLTV)
+                     .OrderBy(candidate => candidate.PlayerName, StringComparer.OrdinalIgnoreCase))
+        {
+            var targetSteamId = target.SteamID.ToString();
+            var targetName = target.PlayerName;
+            state.Options.Add(new RezRankMenuOption(targetName, p =>
+            {
+                if (!IsRankAdmin(p))
+                {
+                    CloseRankMenu(p);
+                    return;
+                }
+
+                CloseRankMenu(p);
+                if (action is AdminAction.AddXp or AdminAction.RemoveXp or AdminAction.SetXp)
+                {
+                    _pendingAdminXp[p.SteamID.ToString()] =
+                        new PendingAdminXpChange(targetSteamId, targetName, action);
+                    var actionText = action switch
+                    {
+                        AdminAction.AddXp => "выдать",
+                        AdminAction.RemoveXp => "снять",
+                        _ => "установить"
+                    };
+                    p.PrintToChat(FormatChat(
+                        "{SILVER}[{ORANGE}RezRank{SILVER}] {YELLOW}Игрок: {GREEN}%PLAYER%. {YELLOW}Введи количество XP командой {ORANGE}!rankamount <число>{YELLOW}, чтобы %ACTION% XP.",
+                        ("%PLAYER%", targetName),
+                        ("%ACTION%", actionText)));
+                    return;
+                }
+
+                if (action == AdminAction.ResetProgress)
+                    _ = ResetAdminPlayerProgressAsync(p, targetSteamId, targetName, _shutdown?.Token ?? CancellationToken.None);
+                else
+                    _ = SendAdminPlayerInfoAsync(p, targetSteamId, targetName, _shutdown?.Token ?? CancellationToken.None);
+            }, requiresAdmin: true));
+        }
+
+        state.Options.Add(new RezRankMenuOption("Назад", p =>
+        {
+            CloseRankMenu(p);
+            OpenAdminMenu(p);
+        }, requiresAdmin: true));
+
+        _rankMenus[admin.Slot] = state;
+        RenderRankMenu(admin, state);
+    }
+
+    private async Task ApplyAdminXpAmountAsync(
+        CCSPlayerController admin,
+        PendingAdminXpChange pending,
+        long amount,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (_database == null)
+                return;
+
+            await _databaseReadyTask;
+            var result = pending.Action switch
+            {
+                AdminAction.AddXp => await _database.AdjustPlayerXpAsync(
+                    pending.TargetSteamId, pending.TargetName, amount, cancellationToken),
+                AdminAction.RemoveXp => await _database.AdjustPlayerXpAsync(
+                    pending.TargetSteamId, pending.TargetName, -amount, cancellationToken),
+                AdminAction.SetXp => await _database.SetPlayerXpAsync(
+                    pending.TargetSteamId, pending.TargetName, amount, cancellationToken),
+                _ => throw new InvalidOperationException("Unsupported admin XP operation.")
+            };
+
+            Server.NextFrame(() =>
+            {
+                if (!admin.IsValid || !IsRankAdmin(admin))
+                    return;
+
+                var actionText = pending.Action switch
+                {
+                    AdminAction.AddXp => "выдано",
+                    AdminAction.RemoveXp => "снято",
+                    _ => "установлено"
+                };
+                admin.PrintToChat(FormatChat(
+                    "{SILVER}[{ORANGE}RezRank{SILVER}] {GREEN}Готово! {YELLOW}Игрок: %PLAYER%. %ACTION% XP: %AMOUNT%. Было: %OLD%, стало: %NEW%.",
+                    ("%PLAYER%", pending.TargetName),
+                    ("%ACTION%", actionText),
+                    ("%AMOUNT%", amount.ToString(CultureInfo.InvariantCulture)),
+                    ("%OLD%", result.PreviousXp.ToString(CultureInfo.InvariantCulture)),
+                    ("%NEW%", result.CurrentXp.ToString(CultureInfo.InvariantCulture))));
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            // Plugin is unloading.
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "RezRank: admin XP operation failed for {SteamId}.", pending.TargetSteamId);
+            Server.NextFrame(() =>
+            {
+                if (admin.IsValid && IsRankAdmin(admin))
+                    admin.PrintToChat(FormatChat("{SILVER}[{ORANGE}RezRank{SILVER}] {RED}Не удалось изменить XP игрока."));
+            });
+        }
+    }
+
+    private async Task ResetAdminPlayerProgressAsync(
+        CCSPlayerController admin,
+        string targetSteamId,
+        string targetName,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (_database == null)
+                return;
+
+            await _databaseReadyTask;
+            await _database.ResetPlayerProgressAsync(targetSteamId, targetName, cancellationToken);
+            Server.NextFrame(() =>
+            {
+                _killStreaks.Remove(targetSteamId);
+                _streakVictims.Remove(targetSteamId);
+                if (admin.IsValid && IsRankAdmin(admin))
+                    admin.PrintToChat(FormatChat(
+                        "{SILVER}[{ORANGE}RezRank{SILVER}] {GREEN}Прогресс игрока {YELLOW}%PLAYER% {GREEN}сброшен: XP, убийства, смерти и достижения обнулены.",
+                        ("%PLAYER%", targetName)));
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            // Plugin is unloading.
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "RezRank: failed to reset progress for {SteamId}.", targetSteamId);
+            Server.NextFrame(() =>
+            {
+                if (admin.IsValid && IsRankAdmin(admin))
+                    admin.PrintToChat(FormatChat("{SILVER}[{ORANGE}RezRank{SILVER}] {RED}Не удалось сбросить прогресс игрока."));
+            });
+        }
+    }
+
+    private async Task SendAdminPlayerInfoAsync(
+        CCSPlayerController admin,
+        string targetSteamId,
+        string targetName,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (_database == null || _config == null)
+                return;
+
+            await _databaseReadyTask;
+            var record = await _database.GetPlayerAsync(targetSteamId, cancellationToken);
+            var achievements = await _database.GetAchievementStatsAsync(targetSteamId, cancellationToken);
+            Server.NextFrame(() =>
+            {
+                if (!admin.IsValid || !IsRankAdmin(admin))
+                    return;
+
+                if (record == null)
+                {
+                    admin.PrintToChat(FormatChat(
+                        "{SILVER}[{ORANGE}RezRank{SILVER}] {YELLOW}У игрока %PLAYER% пока нет записи в базе.",
+                        ("%PLAYER%", targetName)));
+                    return;
+                }
+
+                var rank = IsBypass(targetSteamId) ? _config.Bypass.RankName : GetRank(record.Xp).Name;
+                admin.PrintToChat(FormatChat("{SILVER}######## {GOLD}ИНФОРМАЦИЯ ОБ ИГРОКЕ {SILVER}########"));
+                admin.PrintToChat(FormatChat("{YELLOW}Игрок: {GREEN}%PLAYER% {SILVER}| {YELLOW}SteamID: {GREEN}%STEAMID%",
+                    ("%PLAYER%", record.LastKnownName),
+                    ("%STEAMID%", record.SteamId)));
+                admin.PrintToChat(FormatChat("{YELLOW}Ранг: {GREEN}%RANK% {SILVER}| {YELLOW}XP: {GREEN}%XP%",
+                    ("%RANK%", rank),
+                    ("%XP%", record.Xp.ToString(CultureInfo.InvariantCulture))));
+                admin.PrintToChat(FormatChat("{YELLOW}Убийства: {GREEN}%KILLS% {SILVER}| {YELLOW}Смерти: {GREEN}%DEATHS%",
+                    ("%KILLS%", record.Kills.ToString(CultureInfo.InvariantCulture)),
+                    ("%DEATHS%", record.Deaths.ToString(CultureInfo.InvariantCulture))));
+                admin.PrintToChat(FormatChat("{YELLOW}Дабл: {GREEN}%DOUBLE% {SILVER}| {YELLOW}Трипл: {GREEN}%TRIPLE% {SILVER}| {YELLOW}Квад: {GREEN}%QUAD% {SILVER}| {YELLOW}Эйс: {GREEN}%ACE%",
+                    ("%DOUBLE%", achievements.DoubleKills.ToString(CultureInfo.InvariantCulture)),
+                    ("%TRIPLE%", achievements.TripleKills.ToString(CultureInfo.InvariantCulture)),
+                    ("%QUAD%", achievements.QuadKills.ToString(CultureInfo.InvariantCulture)),
+                    ("%ACE%", achievements.Aces.ToString(CultureInfo.InvariantCulture))));
+                admin.PrintToChat(FormatChat("{SILVER}########################################"));
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            // Plugin is unloading.
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "RezRank: failed to read admin player info for {SteamId}.", targetSteamId);
+            Server.NextFrame(() =>
+            {
+                if (admin.IsValid && IsRankAdmin(admin))
+                    admin.PrintToChat(FormatChat("{SILVER}[{ORANGE}RezRank{SILVER}] {RED}Не удалось получить информацию об игроке."));
+            });
+        }
+    }
+
     private static bool IsRankAdmin(CCSPlayerController player)
     {
         return player.IsValid &&
@@ -994,7 +1310,8 @@ internal sealed class RezRankMenuOption(
 internal sealed class RezRankMenuState
 {
     public List<RezRankMenuOption> Options { get; } = new();
-    public int SelectedIndex { get; set; }
+    public string Title { get; set; } = "RezRank — меню игрока";
+    public int SelectedIndex { get; set;}
     public DateTime OpenedAtUtc { get; set; }
     public DateTime LastInputUtc { get; set; }
     public string PreviousButtons { get; set; } = string.Empty;
