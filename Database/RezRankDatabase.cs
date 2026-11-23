@@ -194,20 +194,34 @@ public sealed class RezRankDatabase
 
     public async Task<int> DeleteInactivePlayersAsync(
         int inactiveDays,
+        IReadOnlyCollection<string>? excludedSteamIds = null,
         CancellationToken cancellationToken = default)
     {
         if (inactiveDays < 1)
             throw new ArgumentOutOfRangeException(nameof(inactiveDays));
 
-        const string sql = """
+        var excludedIds = excludedSteamIds?
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray() ?? Array.Empty<string>();
+
+        var exclusionSql = excludedIds.Length == 0
+            ? string.Empty
+            : $" AND steam_id NOT IN ({string.Join(", ", excludedIds.Select((_, index) => $"@excluded{index}"))})";
+
+        var sql = $"""
             DELETE FROM rezrank_players
-            WHERE last_activity <= UTC_TIMESTAMP(6) - INTERVAL @inactiveDays DAY;
+            WHERE last_activity <= UTC_TIMESTAMP(6) - INTERVAL @inactiveDays DAY{exclusionSql};
             """;
 
         await using var connection = new MySqlConnection(_connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var command = new MySqlCommand(sql, connection);
         command.Parameters.AddWithValue("@inactiveDays", inactiveDays);
+
+        for (var index = 0; index < excludedIds.Length; index++)
+            command.Parameters.AddWithValue($"@excluded{index}", excludedIds[index]);
+
         return await command.ExecuteNonQueryAsync(cancellationToken);
     }
 }
