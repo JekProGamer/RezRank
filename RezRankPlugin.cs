@@ -183,10 +183,10 @@ public sealed class RezRankPlugin : BasePlugin
 
                             (achievementName, achievementXp) = streak switch
                             {
-                                2 => ("Double Kill", _config.Achievements.DoubleKillXp),
-                                3 => ("Triple Kill", _config.Achievements.TripleKillXp),
-                                4 => ("Quad Kill", _config.Achievements.QuadKillXp),
-                                5 => ("Ace", _config.Achievements.AceXp),
+                                2 => ("Дабл-килл", _config.Achievements.DoubleKillXp),
+                                3 => ("Трипл-килл", _config.Achievements.TripleKillXp),
+                                4 => ("Квад-килл", _config.Achievements.QuadKillXp),
+                                5 => ("Эйс", _config.Achievements.AceXp),
                                 _ => (null, 0)
                             };
                         }
@@ -525,10 +525,10 @@ public sealed class RezRankPlugin : BasePlugin
                 player.PrintToChat(FormatChat("{SILVER}####################"));
                 player.PrintToChat(FormatChat("{GOLD}     МОИ ДОСТИЖЕНИЯ"));
                 player.PrintToChat(FormatChat("{SILVER}####################"));
-                player.PrintToChat(FormatChat("{WHITE}Double Kill: {GREEN}%COUNT%", ("%COUNT%", stats.DoubleKills.ToString())));
-                player.PrintToChat(FormatChat("{WHITE}Triple Kill: {GREEN}%COUNT%", ("%COUNT%", stats.TripleKills.ToString())));
-                player.PrintToChat(FormatChat("{WHITE}Quad Kill: {GREEN}%COUNT%", ("%COUNT%", stats.QuadKills.ToString())));
-                player.PrintToChat(FormatChat("{WHITE}Ace: {GREEN}%COUNT%", ("%COUNT%", stats.Aces.ToString())));
+                player.PrintToChat(FormatChat("{WHITE}Дабл-килл: {GREEN}%COUNT%", ("%COUNT%", stats.DoubleKills.ToString())));
+                player.PrintToChat(FormatChat("{WHITE}Трипл-килл: {GREEN}%COUNT%", ("%COUNT%", stats.TripleKills.ToString())));
+                player.PrintToChat(FormatChat("{WHITE}Квад-килл: {GREEN}%COUNT%", ("%COUNT%", stats.QuadKills.ToString())));
+                player.PrintToChat(FormatChat("{WHITE}Эйс: {GREEN}%COUNT%", ("%COUNT%", stats.Aces.ToString())));
                 player.PrintToChat(FormatChat("{SILVER}####################"));
             });
         }
@@ -590,7 +590,7 @@ public sealed class RezRankPlugin : BasePlugin
                         ("%PLAYER%", playerName),
                         ("%TOTAL%", record.Total.ToString())));
                     player.PrintToChat(FormatChat(
-                        "{GREY}   Double: %DOUBLE% | Triple: %TRIPLE% | Quad: %QUAD% | Ace: %ACE%",
+                        "{GREY}   Дабл-килл: %DOUBLE% | Трипл-килл: %TRIPLE% | Квад-килл: %QUAD% | Эйс: %ACE%",
                         ("%DOUBLE%", record.DoubleKills.ToString()),
                         ("%TRIPLE%", record.TripleKills.ToString()),
                         ("%QUAD%", record.QuadKills.ToString()),
