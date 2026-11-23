@@ -251,6 +251,11 @@ public sealed class RezRankPlugin : BasePlugin
             CloseRankMenu(p);
             _ = SendRankProgressAsync(p, _shutdown?.Token ?? CancellationToken.None);
         }));
+        state.Options.Add(new RezRankMenuOption("Достижения", p =>
+        {
+            CloseRankMenu(p);
+            _ = SendAchievementStatsAsync(p, _shutdown?.Token ?? CancellationToken.None);
+        }));
         state.Options.Add(new RezRankMenuOption("Таблица лидеров", p =>
         {
             CloseRankMenu(p);
@@ -505,6 +510,49 @@ public sealed class RezRankPlugin : BasePlugin
         }
     }
 
+    private async Task SendAchievementStatsAsync(
+        CCSPlayerController player,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (_database == null || _config == null)
+                return;
+
+            var steamId = player.SteamID.ToString();
+            await _databaseReadyTask;
+            var stats = await _database.GetAchievementStatsAsync(steamId, cancellationToken);
+
+            Server.NextFrame(() =>
+            {
+                if (!player.IsValid || player.SteamID.ToString() != steamId)
+                    return;
+
+                player.PrintToChat(FormatChat("{SILVER}####################"));
+                player.PrintToChat(FormatChat("{GOLD}     МОИ ДОСТИЖЕНИЯ"));
+                player.PrintToChat(FormatChat("{SILVER}####################"));
+                player.PrintToChat(FormatChat("{WHITE}Double Kill: {GREEN}%COUNT%", ("%COUNT%", stats.DoubleKills.ToString())));
+                player.PrintToChat(FormatChat("{WHITE}Triple Kill: {GREEN}%COUNT%", ("%COUNT%", stats.TripleKills.ToString())));
+                player.PrintToChat(FormatChat("{WHITE}Quad Kill: {GREEN}%COUNT%", ("%COUNT%", stats.QuadKills.ToString())));
+                player.PrintToChat(FormatChat("{WHITE}Ace: {GREEN}%COUNT%", ("%COUNT%", stats.Aces.ToString())));
+                player.PrintToChat(FormatChat("{SILVER}####################"));
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            // Plugin is unloading.
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "RezRank: failed to display achievement statistics.");
+            Server.NextFrame(() =>
+            {
+                if (player.IsValid)
+                    player.PrintToChat(FormatChat(_config?.ChatMessages.Error ?? "{RED}Не удалось получить достижения."));
+            });
+        }
+    }
+
     private async Task SendLeaderboardAsync(
         CCSPlayerController player,
         CancellationToken cancellationToken)
@@ -618,6 +666,7 @@ public sealed class RezRankPlugin : BasePlugin
                 victimSteamId,
                 victimName,
                 attackerIsBypass ? 0 : checked(xpReward + achievementXp),
+                achievementName,
                 cancellationToken);
 
             if (attackerIsBypass)
