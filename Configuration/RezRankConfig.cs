@@ -6,6 +6,7 @@ public sealed class RezRankConfig
 {
     public DatabaseConfig Database { get; set; } = new();
     public DatabaseCleanupConfig DatabaseCleanup { get; set; } = new();
+    public RankProgressionConfig RankProgression { get; set; } = new();
 
     public static RezRankConfig Load(string path)
     {
@@ -57,4 +58,35 @@ public sealed class DatabaseCleanupConfig
     public int InactiveDays { get; set; } = 4;
     public int CheckIntervalHours { get; set; } = 24;
     public bool ExcludeBypassPlayers { get; set; } = true;
+}
+
+public sealed class RankProgressionConfig
+{
+    public List<RankDefinition> Ranks { get; set; } = new()
+    {
+        new() { Name = "Silver I", MinXp = 0 },
+        new() { Name = "Silver II", MinXp = 100 },
+        new() { Name = "Silver III", MinXp = 250 },
+        new() { Name = "Silver IV", MinXp = 450 },
+        new() { Name = "Silver Elite", MinXp = 700 },
+        new() { Name = "Silver Elite Master", MinXp = 1000 },
+        new() { Name = "Gold Nova I", MinXp = 1400 },
+        new() { Name = "Gold Nova II", MinXp = 1900 },
+        new() { Name = "Gold Nova III", MinXp = 2500 },
+        new() { Name = "Gold Nova Master", MinXp = 3200 },
+        new() { Name = "Master Guardian I", MinXp = 4000 },
+        new() { Name = "Master Guardian II", MinXp = 5000 },
+        new() { Name = "Master Guardian Elite", MinXp = 6200 },
+        new() { Name = "Distinguished Master Guardian", MinXp = 7600 },
+        new() { Name = "Legendary Eagle", MinXp = 9200 },
+        new() { Name = "Legendary Eagle Master", MinXp = 11000 },
+        new() { Name = "Supreme Master First Class", MinXp = 13000 },
+        new() { Name = "The Global Elite", MinXp = 15500 }
+    };
+}
+
+public sealed class RankDefinition
+{
+    public string Name { get; set; } = "Silver I";
+    public long MinXp { get; set; }
 }
