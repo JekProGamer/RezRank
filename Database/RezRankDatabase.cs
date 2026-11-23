@@ -65,6 +65,44 @@ public sealed class RezRankDatabase
         };
     }
 
+
+    public async Task<List<PlayerRecord>> GetTopPlayersAsync(
+        int limit = 10,
+        CancellationToken cancellationToken = default)
+    {
+        if (limit < 1)
+            throw new ArgumentOutOfRangeException(nameof(limit));
+
+        const string sql = """
+            SELECT steam_id, last_known_name, xp, kills, deaths, last_activity
+            FROM rezrank_players
+            ORDER BY xp DESC, kills DESC, deaths ASC, last_activity ASC
+            LIMIT @limit;
+            """;
+
+        var players = new List<PlayerRecord>();
+        await using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@limit", limit);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            players.Add(new PlayerRecord
+            {
+                SteamId = reader.GetString(reader.GetOrdinal("steam_id")),
+                LastKnownName = reader.GetString(reader.GetOrdinal("last_known_name")),
+                Xp = reader.GetInt64(reader.GetOrdinal("xp")),
+                Kills = reader.GetInt32(reader.GetOrdinal("kills")),
+                Deaths = reader.GetInt32(reader.GetOrdinal("deaths")),
+                LastActivity = reader.GetDateTime(reader.GetOrdinal("last_activity"))
+            });
+        }
+
+        return players;
+    }
+
     public async Task UpsertPlayerActivityAsync(
         string steamId,
         string playerName,
