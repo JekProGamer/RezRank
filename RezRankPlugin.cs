@@ -197,7 +197,7 @@ public sealed class RezRankPlugin : BasePlugin
             CloseRankMenu(p);
             _ = SendPlayerStatusAsync(p, includeStats: false, _shutdown?.Token ?? CancellationToken.None);
         }));
-        state.Options.Add(new RezRankMenuOption("Next Rank", p =>
+        state.Options.Add(new RezRankMenuOption("Следующий Ранг", p =>
         {
             CloseRankMenu(p);
             _ = SendRankProgressAsync(p, _shutdown?.Token ?? CancellationToken.None);
