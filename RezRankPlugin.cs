@@ -58,6 +58,12 @@ public sealed class RezRankPlugin : BasePlugin
             if (_config.RankProgression.XpPerKill < 0)
                 throw new InvalidOperationException("RankProgression.XpPerKill cannot be negative.");
 
+            if (_config.Achievements.DoubleKillXp < 0 ||
+                _config.Achievements.TripleKillXp < 0 ||
+                _config.Achievements.QuadKillXp < 0 ||
+                _config.Achievements.AceXp < 0)
+                throw new InvalidOperationException("Achievement XP rewards cannot be negative.");
+
             if (_config.DatabaseCleanup.CheckIntervalHours < 1)
                 throw new InvalidOperationException("DatabaseCleanup.CheckIntervalHours must be at least 1.");
             if (_config.DatabaseCleanup.InactiveDays < 1)
@@ -97,6 +103,8 @@ public sealed class RezRankPlugin : BasePlugin
                     var player = @event.Userid;
                     if (player != null)
                         _rankMenus.Remove(player.Slot);
+
+                    _killStreaks.Remove(@event.Xuid.ToString());
                 }
 
                 return HookResult.Continue;
