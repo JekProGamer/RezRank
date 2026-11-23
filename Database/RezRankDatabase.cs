@@ -340,6 +340,169 @@ public sealed class RezRankDatabase
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    public async Task<KillXpResult> AdjustPlayerXpAsync(
+        string steamId,
+        string playerName,
+        long amount,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        const string ensurePlayerSql = """
+            INSERT INTO rezrank_players (steam_id, last_known_name, last_activity)
+            VALUES (@steamId, @playerName, UTC_TIMESTAMP(6))
+            ON DUPLICATE KEY UPDATE
+                last_known_name = VALUES(last_known_name),
+                last_activity = UTC_TIMESTAMP(6);
+            """;
+
+        await using (var command = new MySqlCommand(ensurePlayerSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("@steamId", steamId);
+            command.Parameters.AddWithValue("@playerName", playerName);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        long previousXp;
+        await using (var command = new MySqlCommand(
+            "SELECT xp FROM rezrank_players WHERE steam_id = @steamId FOR UPDATE;",
+            connection,
+            transaction))
+        {
+            command.Parameters.AddWithValue("@steamId", steamId);
+            previousXp = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken));
+        }
+
+        var currentXp = Math.Max(0L, checked(previousXp + amount));
+        await using (var command = new MySqlCommand(
+            """
+            UPDATE rezrank_players
+            SET xp = @xp, last_known_name = @playerName, last_activity = UTC_TIMESTAMP(6)
+            WHERE steam_id = @steamId;
+            """,
+            connection,
+            transaction))
+        {
+            command.Parameters.AddWithValue("@xp", currentXp);
+            command.Parameters.AddWithValue("@playerName", playerName);
+            command.Parameters.AddWithValue("@steamId", steamId);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return new KillXpResult(previousXp, currentXp);
+    }
+
+    public async Task<KillXpResult> SetPlayerXpAsync(
+        string steamId,
+        string playerName,
+        long xp,
+        CancellationToken cancellationToken = default)
+    {
+        if (xp < 0)
+            throw new ArgumentOutOfRangeException(nameof(xp));
+
+        await using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        const string ensurePlayerSql = """
+            INSERT INTO rezrank_players (steam_id, last_known_name, last_activity)
+            VALUES (@steamId, @playerName, UTC_TIMESTAMP(6))
+            ON DUPLICATE KEY UPDATE
+                last_known_name = VALUES(last_known_name),
+                last_activity = UTC_TIMESTAMP(6);
+            """;
+
+        await using (var command = new MySqlCommand(ensurePlayerSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("@steamId", steamId);
+            command.Parameters.AddWithValue("@playerName", playerName);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        long previousXp;
+        await using (var command = new MySqlCommand(
+            "SELECT xp FROM rezrank_players WHERE steam_id = @steamId FOR UPDATE;",
+            connection,
+            transaction))
+        {
+            command.Parameters.AddWithValue("@steamId", steamId);
+            previousXp = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken));
+        }
+
+        await using (var command = new MySqlCommand(
+            """
+            UPDATE rezrank_players
+            SET xp = @xp, last_known_name = @playerName, last_activity = UTC_TIMESTAMP(6)
+            WHERE steam_id = @steamId;
+            """,
+            connection,
+            transaction))
+        {
+            command.Parameters.AddWithValue("@xp", xp);
+            command.Parameters.AddWithValue("@playerName", playerName);
+            command.Parameters.AddWithValue("@steamId", steamId);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return new KillXpResult(previousXp, xp);
+    }
+
+    public async Task ResetPlayerProgressAsync(
+        string steamId,
+        string playerName,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        const string ensurePlayerSql = """
+            INSERT INTO rezrank_players (steam_id, last_known_name, last_activity)
+            VALUES (@steamId, @playerName, UTC_TIMESTAMP(6))
+            ON DUPLICATE KEY UPDATE
+                last_known_name = VALUES(last_known_name),
+                last_activity = UTC_TIMESTAMP(6);
+            """;
+
+        await using (var command = new MySqlCommand(ensurePlayerSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("@steamId", steamId);
+            command.Parameters.AddWithValue("@playerName", playerName);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await using (var command = new MySqlCommand(
+            """
+            UPDATE rezrank_players
+            SET xp = 0, kills = 0, deaths = 0,
+                last_known_name = @playerName, last_activity = UTC_TIMESTAMP(6)
+            WHERE steam_id = @steamId;
+            """,
+            connection,
+            transaction))
+        {
+            command.Parameters.AddWithValue("@playerName", playerName);
+            command.Parameters.AddWithValue("@steamId", steamId);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await using (var command = new MySqlCommand(
+            "DELETE FROM rezrank_achievements WHERE steam_id = @steamId;",
+            connection,
+            transaction))
+        {
+            command.Parameters.AddWithValue("@steamId", steamId);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     public async Task<int> DeleteInactivePlayersAsync(
         int inactiveDays,
         IReadOnlyCollection<string>? excludedSteamIds = null,
