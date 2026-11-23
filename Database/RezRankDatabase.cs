@@ -4,6 +4,7 @@ using RezRank.Configuration;
 namespace RezRank.Database;
 
 public readonly record struct KillXpResult(long PreviousXp, long CurrentXp);
+public readonly record struct AchievementStats(int DoubleKills, int TripleKills, int QuadKills, int Aces);
 
 public sealed class RezRankDatabase
 {
@@ -32,8 +33,25 @@ public sealed class RezRankDatabase
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
             """;
 
-        await using var command = new MySqlCommand(sql, connection);
-        await command.ExecuteNonQueryAsync(cancellationToken);
+        await using (var command = new MySqlCommand(sql, connection))
+            await command.ExecuteNonQueryAsync(cancellationToken);
+
+        const string achievementsSql = """
+            CREATE TABLE IF NOT EXISTS rezrank_achievements (
+                steam_id VARCHAR(32) NOT NULL,
+                double_kills INT NOT NULL DEFAULT 0,
+                triple_kills INT NOT NULL DEFAULT 0,
+                quad_kills INT NOT NULL DEFAULT 0,
+                aces INT NOT NULL DEFAULT 0,
+                PRIMARY KEY (steam_id),
+                CONSTRAINT fk_rezrank_achievements_player
+                    FOREIGN KEY (steam_id) REFERENCES rezrank_players (steam_id)
+                    ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            """;
+
+        await using (var command = new MySqlCommand(achievementsSql, connection))
+            await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     public async Task<PlayerRecord?> GetPlayerAsync(string steamId, CancellationToken cancellationToken = default)
@@ -103,6 +121,33 @@ public sealed class RezRankDatabase
         return players;
     }
 
+    public async Task<AchievementStats> GetAchievementStatsAsync(
+        string steamId,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT double_kills, triple_kills, quad_kills, aces
+            FROM rezrank_achievements
+            WHERE steam_id = @steamId
+            LIMIT 1;
+            """;
+
+        await using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new MySqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@steamId", steamId);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+            return new AchievementStats(0, 0, 0, 0);
+
+        return new AchievementStats(
+            reader.GetInt32(reader.GetOrdinal("double_kills")),
+            reader.GetInt32(reader.GetOrdinal("triple_kills")),
+            reader.GetInt32(reader.GetOrdinal("quad_kills")),
+            reader.GetInt32(reader.GetOrdinal("aces")));
+    }
+
     public async Task UpsertPlayerActivityAsync(
         string steamId,
         string playerName,
@@ -130,6 +175,7 @@ public sealed class RezRankDatabase
         string victimSteamId,
         string victimName,
         int xpReward,
+        string? achievementName,
         CancellationToken cancellationToken = default)
     {
         if (xpReward < 0)
@@ -185,6 +231,28 @@ public sealed class RezRankDatabase
         {
             command.Parameters.AddWithValue("@xpReward", xpReward);
             command.Parameters.AddWithValue("@playerName", attackerName);
+            command.Parameters.AddWithValue("@steamId", attackerSteamId);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        var achievementColumn = achievementName switch
+        {
+            "Double Kill" => "double_kills",
+            "Triple Kill" => "triple_kills",
+            "Quad Kill" => "quad_kills",
+            "Ace" => "aces",
+            _ => null
+        };
+
+        if (achievementColumn != null)
+        {
+            var achievementSql = $"""
+                INSERT INTO rezrank_achievements (steam_id, {achievementColumn})
+                VALUES (@steamId, 1)
+                ON DUPLICATE KEY UPDATE {achievementColumn} = {achievementColumn} + 1;
+                """;
+
+            await using var command = new MySqlCommand(achievementSql, connection, transaction);
             command.Parameters.AddWithValue("@steamId", attackerSteamId);
             await command.ExecuteNonQueryAsync(cancellationToken);
         }
