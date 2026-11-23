@@ -1,5 +1,9 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Core.Attributes.Registration;
+using CounterStrikeSharp.API.Modules.Commands;
+using CounterStrikeSharp.API.Core.Capabilities;
+using WASDSharedAPI;
 using Microsoft.Extensions.Logging;
 using RezRank.Configuration;
 using RezRank.Database;
@@ -52,6 +56,8 @@ public sealed class RezRankPlugin : BasePlugin
 
             _database = new RezRankDatabase(_config.Database);
             _databaseReadyTask = InitializeDatabaseAsync(cancellationToken);
+
+            Logger.LogInformation("RezRank: WASDMenuAPI integration enabled; players can open the menu with !rank.");
 
             if (_config.DatabaseCleanup.Enabled)
                 _ = RunDatabaseCleanupLoopAsync(cancellationToken);
@@ -151,6 +157,103 @@ public sealed class RezRankPlugin : BasePlugin
         _shutdown?.Cancel();
         _shutdown?.Dispose();
         _shutdown = null;
+    }
+
+
+    [ConsoleCommand("css_rank")]
+    public void OpenRankMenu(CCSPlayerController? player, CommandInfo? info)
+    {
+        if (player == null || !player.IsValid || player.IsBot || player.IsHLTV)
+            return;
+
+        var manager = new PluginCapability<IWasdMenuManager>("wasdmenu:manager").Get();
+        if (manager == null)
+        {
+            player.PrintToChat("[RezRank] Меню недоступно: WASDMenuAPI не загружен.");
+            return;
+        }
+
+        var menu = manager.CreateMenu("RezRank — меню игрока");
+        menu.Add("Статус (вывести в чат)", (p, option) =>
+        {
+            manager.CloseMenu(p);
+            _ = SendPlayerStatusAsync(p, includeStats: true, _shutdown?.Token ?? CancellationToken.None);
+        });
+        menu.Add("Мой ранг", (p, option) =>
+        {
+            manager.CloseMenu(p);
+            _ = SendPlayerStatusAsync(p, includeStats: false, _shutdown?.Token ?? CancellationToken.None);
+        });
+        menu.Add("Закрыть", (p, option) => manager.CloseMenu(p));
+
+        manager.OpenMainMenu(player, menu);
+    }
+
+    private async Task SendPlayerStatusAsync(
+        CCSPlayerController player,
+        bool includeStats,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (_database == null || _config == null)
+                return;
+
+            var steamId = player.SteamID.ToString();
+            await _databaseReadyTask;
+            var record = await _database.GetPlayerAsync(steamId, cancellationToken);
+
+            Server.NextFrame(() =>
+            {
+                if (!player.IsValid || player.SteamID.ToString() != steamId)
+                    return;
+
+                if (record == null)
+                {
+                    player.PrintToChat("[RezRank] Статистика пока не найдена. Сыграйте немного, чтобы создать запись.");
+                    return;
+                }
+
+                var isBypass = IsBypass(steamId);
+                var rank = isBypass ? _config.Bypass.RankName : GetRank(record.Xp).Name;
+
+                if (!includeStats)
+                {
+                    player.PrintToChat($"[RezRank] Ваш ранг: {rank} | XP: {record.Xp}");
+                    return;
+                }
+
+                var nextRank = _config.RankProgression.Ranks
+                    .Where(r => r != null && r.MinXp > record.Xp)
+                    .OrderBy(r => r.MinXp)
+                    .FirstOrDefault();
+
+                var progressText = nextRank == null
+                    ? "Максимальный ранг"
+                    : $"До {nextRank.Name}: {nextRank.MinXp - record.Xp} XP";
+
+                var kd = record.Deaths == 0
+                    ? record.Kills.ToString()
+                    : ((double)record.Kills / record.Deaths).ToString("0.00");
+
+                player.PrintToChat($"[RezRank] Статус: {rank} | XP: {record.Xp}");
+                player.PrintToChat($"[RezRank] Убийства: {record.Kills} | Смерти: {record.Deaths} | K/D: {kd}");
+                player.PrintToChat($"[RezRank] {progressText}");
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            // Plugin is unloading.
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "RezRank: failed to display player status.");
+            Server.NextFrame(() =>
+            {
+                if (player.IsValid)
+                    player.PrintToChat("[RezRank] Не удалось получить статус. Попробуйте позже.");
+            });
+        }
     }
 
     private async Task SavePlayerActivityAsync(
