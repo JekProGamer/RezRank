@@ -7,6 +7,7 @@ public sealed class RezRankConfig
     public DatabaseConfig Database { get; set; } = new();
     public DatabaseCleanupConfig DatabaseCleanup { get; set; } = new();
     public RankProgressionConfig RankProgression { get; set; } = new();
+    public BypassConfig Bypass { get; set; } = new();
 
     public static RezRankConfig Load(string path)
     {
@@ -58,6 +59,14 @@ public sealed class DatabaseCleanupConfig
     public int InactiveDays { get; set; } = 4;
     public int CheckIntervalHours { get; set; } = 24;
     public bool ExcludeBypassPlayers { get; set; } = true;
+}
+
+public sealed class BypassConfig
+{
+    public bool Enabled { get; set; } = true;
+    public string RankName { get; set; } = "BYPASS";
+    public string ImagePath { get; set; } = "materials/rezrank/bypass.png";
+    public List<string> SteamIds { get; set; } = new();
 }
 
 public sealed class RankProgressionConfig
