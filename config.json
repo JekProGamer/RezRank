@@ -15,6 +15,7 @@
     "ExcludeBypassPlayers": true
   },
   "RankProgression": {
+    "XpPerKill": 10,
     "Ranks": [
       { "Name": "Silver I", "MinXp": 0 },
       { "Name": "Silver II", "MinXp": 100 },
