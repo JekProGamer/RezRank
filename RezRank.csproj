@@ -14,7 +14,10 @@
     <PackageReference Include="CounterStrikeSharp.API" Version="1.0.369" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="MySqlConnector" Version="2.6.1" />
-    <Reference Include="WASDSharedAPI">\n      <HintPath>lib/WASDSharedAPI.dll</HintPath>\n      <Private>true</Private>\n    </Reference>\n  </ItemGroup>
+    <Reference Include="WASDSharedAPI">
+      <HintPath>lib/WASDSharedAPI.dll</HintPath>
+      <Private>true</Private>
+    </Reference>\n  </ItemGroup>
 
   <ItemGroup>
     <None Update="config.json" CopyToOutputDirectory="PreserveNewest" />
