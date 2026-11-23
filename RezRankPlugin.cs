@@ -64,6 +64,9 @@ public sealed class RezRankPlugin : BasePlugin
                 _config.Achievements.AceXp < 0)
                 throw new InvalidOperationException("Achievement XP rewards cannot be negative.");
 
+            if (_config.AntiFarm.SameVictimCooldownMinutes < 0)
+                throw new InvalidOperationException("AntiFarm.SameVictimCooldownMinutes cannot be negative.");
+
             if (_config.DatabaseCleanup.CheckIntervalHours < 1)
                 throw new InvalidOperationException("DatabaseCleanup.CheckIntervalHours must be at least 1.");
             if (_config.DatabaseCleanup.InactiveDays < 1)
@@ -158,32 +161,13 @@ public sealed class RezRankPlugin : BasePlugin
                         return;
                     }
 
-                    string? achievementName = null;
-                    var achievementXp = 0;
-                    if (_config!.Achievements.Enabled && !attackerIsBypass)
-                    {
-                        var streak = _killStreaks.GetValueOrDefault(attackerSteamId) + 1;
-                        _killStreaks[attackerSteamId] = streak;
-
-                        (achievementName, achievementXp) = streak switch
-                        {
-                            2 => ("Double Kill", _config.Achievements.DoubleKillXp),
-                            3 => ("Triple Kill", _config.Achievements.TripleKillXp),
-                            4 => ("Quad Kill", _config.Achievements.QuadKillXp),
-                            5 => ("Ace", _config.Achievements.AceXp),
-                            _ => (null, 0)
-                        };
-                    }
-
                     _ = ProcessKillAsync(
                         attackerSteamId,
                         attackerName,
                         victimSteamId,
                         victimName,
-                        victimIsBypass ? 20 : _config.RankProgression.XpPerKill,
+                        victimIsBypass ? 20 : _config!.RankProgression.XpPerKill,
                         attackerIsBypass,
-                        achievementName,
-                        achievementXp,
                         cancellationToken);
                 });
 
@@ -585,8 +569,6 @@ public sealed class RezRankPlugin : BasePlugin
         string victimName,
         int xpReward,
         bool attackerIsBypass,
-        string? achievementName,
-        int achievementXp,
         CancellationToken cancellationToken)
     {
         try
@@ -595,15 +577,43 @@ public sealed class RezRankPlugin : BasePlugin
                 return;
 
             await _databaseReadyTask;
+
+            var rewardAllowed = true;
+            if (!attackerIsBypass && _config.AntiFarm.Enabled)
+            {
+                rewardAllowed = await _database.TryClaimKillRewardAsync(
+                    attackerSteamId,
+                    victimSteamId,
+                    _config.AntiFarm.SameVictimCooldownMinutes,
+                    cancellationToken);
+            }
+
+            string? achievementName = null;
+            var achievementXp = 0;
+            if (rewardAllowed && !attackerIsBypass && _config.Achievements.Enabled)
+            {
+                var streak = _killStreaks.GetValueOrDefault(attackerSteamId) + 1;
+                _killStreaks[attackerSteamId] = streak;
+
+                (achievementName, achievementXp) = streak switch
+                {
+                    2 => ("Double Kill", _config.Achievements.DoubleKillXp),
+                    3 => ("Triple Kill", _config.Achievements.TripleKillXp),
+                    4 => ("Quad Kill", _config.Achievements.QuadKillXp),
+                    5 => ("Ace", _config.Achievements.AceXp),
+                    _ => (null, 0)
+                };
+            }
+
             var result = await _database.ApplyKillAsync(
                 attackerSteamId,
                 attackerName,
                 victimSteamId,
                 victimName,
-                attackerIsBypass ? 0 : checked(xpReward + achievementXp),
+                attackerIsBypass || !rewardAllowed ? 0 : checked(xpReward + achievementXp),
                 cancellationToken);
 
-            if (attackerIsBypass)
+            if (attackerIsBypass || !rewardAllowed)
                 return;
 
             if (!string.IsNullOrWhiteSpace(achievementName))
