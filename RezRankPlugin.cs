@@ -493,7 +493,7 @@ public sealed class RezRankPlugin : BasePlugin
                     var playerName = string.IsNullOrWhiteSpace(record.LastKnownName)
                         ? "Неизвестный игрок"
                         : record.LastKnownName;
-                    var placeColor = index == 0 ? "{GOLD}" : index == 1 ? "{SILVER}" : index == 2 ? "{ORANGE}" : "{YELLOW}";
+                    var placeColor = index == 0 ? "{GOLD}" : index == 1 ? "{SILVER}" : index == 2 ? "{ORANGE}" : "{LIGHTBLUE}";
 
                     player.PrintToChat(FormatChat(
                         "{SILVER}#%PLACE% {WHITE}%PLAYER% {SILVER}| {BLUE}%RANK% {SILVER}| {YELLOW}XP: {GREEN}%XP%"
