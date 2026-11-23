@@ -202,6 +202,11 @@ public sealed class RezRankPlugin : BasePlugin
             CloseRankMenu(p);
             _ = SendRankProgressAsync(p, _shutdown?.Token ?? CancellationToken.None);
         }));
+        state.Options.Add(new RezRankMenuOption("Таблица лидеров", p =>
+        {
+            CloseRankMenu(p);
+            _ = SendLeaderboardAsync(p, _shutdown?.Token ?? CancellationToken.None);
+        }));
 
         _rankMenus[player.Slot] = state;
         RenderRankMenu(player, state);
@@ -434,6 +439,67 @@ public sealed class RezRankPlugin : BasePlugin
             {
                 if (player.IsValid)
                     player.PrintToChat(FormatChat(_config?.ChatMessages.Error ?? "{RED}Не удалось получить статус."));
+            });
+        }
+    }
+
+    private async Task SendLeaderboardAsync(
+        CCSPlayerController player,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (_database == null || _config == null)
+                return;
+
+            var steamId = player.SteamID.ToString();
+            await _databaseReadyTask;
+            var topPlayers = await _database.GetTopPlayersAsync(10, cancellationToken);
+
+            Server.NextFrame(() =>
+            {
+                if (!player.IsValid || player.SteamID.ToString() != steamId)
+                    return;
+
+                if (topPlayers.Count == 0)
+                {
+                    player.PrintToChat(FormatChat(_config.ChatMessages.NoData));
+                    return;
+                }
+
+                player.PrintToChat(FormatChat(
+                    "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {YELLOW}ТОП-10 игроков по XP:"));
+
+                for (var index = 0; index < topPlayers.Count; index++)
+                {
+                    var record = topPlayers[index];
+                    var rank = IsBypass(record.SteamId)
+                        ? _config.Bypass.RankName
+                        : GetRank(record.Xp).Name;
+                    var playerName = string.IsNullOrWhiteSpace(record.LastKnownName)
+                        ? "Неизвестный игрок"
+                        : record.LastKnownName;
+
+                    player.PrintToChat(FormatChat(
+                        "{SILVER}#{YELLOW}%PLACE% {WHITE}%PLAYER% {SILVER}| {BLUE}%RANK% {SILVER}| {YELLOW}XP: {GREEN}%XP%",
+                        ("%PLACE%", (index + 1).ToString()),
+                        ("%PLAYER%", playerName),
+                        ("%RANK%", rank),
+                        ("%XP%", record.Xp.ToString())));
+                }
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            // Plugin is unloading.
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "RezRank: failed to display the XP leaderboard.");
+            Server.NextFrame(() =>
+            {
+                if (player.IsValid)
+                    player.PrintToChat(FormatChat(_config?.ChatMessages.Error ?? "{RED}Не удалось получить таблицу лидеров."));
             });
         }
     }
