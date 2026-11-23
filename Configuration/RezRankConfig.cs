@@ -62,6 +62,8 @@ public sealed class DatabaseCleanupConfig
 
 public sealed class RankProgressionConfig
 {
+    public int XpPerKill { get; set; } = 10;
+
     public List<RankDefinition> Ranks { get; set; } = new()
     {
         new() { Name = "Silver I", MinXp = 0 },
