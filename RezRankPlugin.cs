@@ -197,7 +197,6 @@ public sealed class RezRankPlugin : BasePlugin
             CloseRankMenu(p);
             _ = SendPlayerStatusAsync(p, includeStats: false, _shutdown?.Token ?? CancellationToken.None);
         }));
-        state.Options.Add(new RezRankMenuOption("Закрыть", p => CloseRankMenu(p)));
 
         _rankMenus[player.Slot] = state;
         RenderRankMenu(player, state);
