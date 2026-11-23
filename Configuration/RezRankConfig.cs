@@ -10,6 +10,7 @@ public sealed class RezRankConfig
     public BypassConfig Bypass { get; set; } = new();
     public AnnouncementsConfig Announcements { get; set; } = new();
     public ChatMessagesConfig ChatMessages { get; set; } = new();
+    public KillStreakAchievementsConfig Achievements { get; set; } = new();
 
     public static RezRankConfig Load(string path)
     {
@@ -111,6 +112,17 @@ public sealed class RankDefinition
     public long MinXp { get; set; }
 }
 
+
+public sealed class KillStreakAchievementsConfig
+{
+    public bool Enabled { get; set; } = true;
+    public int DoubleKillXp { get; set; } = 5;
+    public int TripleKillXp { get; set; } = 10;
+    public int QuadKillXp { get; set; } = 20;
+    public int AceXp { get; set; } = 35;
+    public string Message { get; set; } =
+        "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {GOLD}%ACHIEVEMENT%! {GREEN}+%XP% XP";
+}
 
 public sealed class ChatMessagesConfig
 {
