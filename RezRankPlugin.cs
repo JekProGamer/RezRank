@@ -33,6 +33,22 @@ public sealed class RezRankPlugin : BasePlugin
 
             _database = new RezRankDatabase(_config.Database);
             _ = InitializeDatabaseAsync(_shutdown.Token);
+
+            RegisterEventHandler<EventPlayerConnectFull>((@event, info) =>
+            {
+                var player = @event.Userid;
+
+                if (player == null || !player.IsValid || player.IsBot || player.IsHLTV)
+                    return HookResult.Continue;
+
+                // Copy player data while the game event is still valid.
+                var steamId = player.SteamID.ToString();
+                var playerName = player.PlayerName;
+
+                _ = SavePlayerActivityAsync(steamId, playerName, _shutdown.Token);
+
+                return HookResult.Continue;
+            });
         }
         catch (Exception exception)
         {
@@ -45,6 +61,29 @@ public sealed class RezRankPlugin : BasePlugin
         _shutdown?.Cancel();
         _shutdown?.Dispose();
         _shutdown = null;
+    }
+
+    private async Task SavePlayerActivityAsync(
+        string steamId,
+        string playerName,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (_database == null)
+                return;
+
+            await _database.UpsertPlayerActivityAsync(steamId, playerName, cancellationToken);
+            Logger.LogInformation("RezRank: player {PlayerName} ({SteamId}) saved to MySQL.", playerName, steamId);
+        }
+        catch (OperationCanceledException)
+        {
+            // Plugin is unloading.
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "RezRank: failed to save player {PlayerName} ({SteamId}).", playerName, steamId);
+        }
     }
 
     private async Task InitializeDatabaseAsync(CancellationToken cancellationToken)
