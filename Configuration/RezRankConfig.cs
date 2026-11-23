@@ -8,6 +8,7 @@ public sealed class RezRankConfig
     public DatabaseCleanupConfig DatabaseCleanup { get; set; } = new();
     public RankProgressionConfig RankProgression { get; set; } = new();
     public BypassConfig Bypass { get; set; } = new();
+    public AnnouncementsConfig Announcements { get; set; } = new();
     public ChatMessagesConfig ChatMessages { get; set; } = new();
 
     public static RezRankConfig Load(string path)
@@ -60,6 +61,13 @@ public sealed class DatabaseCleanupConfig
     public int InactiveDays { get; set; } = 4;
     public int CheckIntervalHours { get; set; } = 24;
     public bool ExcludeBypassPlayers { get; set; } = true;
+}
+
+public sealed class AnnouncementsConfig
+{
+    public bool BroadcastMaxRank { get; set; } = true;
+    public string MaxRankReached { get; set; } =
+        "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {GOLD}Уважаемый игрок {WHITE}%PLAYER% {GOLD}достиг последнего ранга {BLUE}%RANK%{GOLD}! Поздравляем!";
 }
 
 public sealed class BypassConfig
