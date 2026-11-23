@@ -224,12 +224,12 @@ public sealed class RezRankPlugin : BasePlugin
 
 
     [ConsoleCommand("css_top")]
-    public void ShowTopPlayers(CCSPlayerController? player, CommandInfo? info)
+    public void ShowTopAchievements(CCSPlayerController? player, CommandInfo? info)
     {
         if (player == null || !player.IsValid || player.IsBot || player.IsHLTV)
             return;
 
-        _ = SendTopPlayersAsync(player, _shutdown?.Token ?? CancellationToken.None);
+        _ = SendAchievementLeaderboardAsync(player, _shutdown?.Token ?? CancellationToken.None);
     }
 
     [ConsoleCommand("css_rank")]
@@ -562,7 +562,7 @@ public sealed class RezRankPlugin : BasePlugin
         }
     }
 
-    private async Task SendTopPlayersAsync(
+    private async Task SendAchievementLeaderboardAsync(
         CCSPlayerController player,
         CancellationToken cancellationToken)
     {
@@ -573,8 +573,7 @@ public sealed class RezRankPlugin : BasePlugin
 
             var steamId = player.SteamID.ToString();
             await _databaseReadyTask;
-            // Use the same XP-sorted player records as the existing TOP 10.
-            var topPlayers = await _database.GetTopPlayersAsync(5, cancellationToken);
+            var topPlayers = await _database.GetTopAchievementPlayersAsync(5, cancellationToken);
 
             Server.NextFrame(() =>
             {
@@ -588,35 +587,29 @@ public sealed class RezRankPlugin : BasePlugin
                 }
 
                 player.PrintToChat(FormatChat("{SILVER}####################"));
-                player.PrintToChat(FormatChat("{GOLD}       TOP 5 REZRANK"));
+                player.PrintToChat(FormatChat("{GOLD}       ТОП-5 ДОСТИЖЕНИЙ"));
                 player.PrintToChat(FormatChat("{SILVER}####################"));
 
                 for (var index = 0; index < topPlayers.Count; index++)
                 {
                     var record = topPlayers[index];
-                    var rank = IsBypass(record.SteamId)
-                        ? _config.Bypass.RankName
-                        : GetRank(record.Xp).Name;
-                    var playerName = string.IsNullOrWhiteSpace(record.LastKnownName)
+                    var playerName = string.IsNullOrWhiteSpace(record.PlayerName)
                         ? "Неизвестный игрок"
-                        : record.LastKnownName;
+                        : record.PlayerName;
                     var placeColor = index == 0 ? "{GOLD}" : index == 1 ? "{SILVER}" : index == 2 ? "{ORANGE}" : "{LIGHTBLUE}";
-                    var kd = record.Deaths == 0
-                        ? record.Kills.ToString()
-                        : ((double)record.Kills / record.Deaths).ToString("0.00");
 
                     player.PrintToChat(FormatChat(
-                        "%PLACE_COLOR%#%PLACE% {WHITE}%PLAYER% {SILVER}| {BLUE}%RANK% {SILVER}| {YELLOW}XP: {GREEN}%XP%",
+                        "%PLACE_COLOR%#%PLACE% {WHITE}%PLAYER% {SILVER}| {GREEN}%TOTAL% наград",
                         ("%PLACE_COLOR%", placeColor),
                         ("%PLACE%", (index + 1).ToString()),
                         ("%PLAYER%", playerName),
-                        ("%RANK%", rank),
-                        ("%XP%", record.Xp.ToString())));
+                        ("%TOTAL%", record.Total.ToString())));
                     player.PrintToChat(FormatChat(
-                        "{GREY}   Убийства: %KILLS% | Смерти: %DEATHS% | K/D: %KD%",
-                        ("%KILLS%", record.Kills.ToString()),
-                        ("%DEATHS%", record.Deaths.ToString()),
-                        ("%KD%", kd)));
+                        "{GREY}   Double: %DOUBLE% | Triple: %TRIPLE% | Quad: %QUAD% | Ace: %ACE%",
+                        ("%DOUBLE%", record.DoubleKills.ToString()),
+                        ("%TRIPLE%", record.TripleKills.ToString()),
+                        ("%QUAD%", record.QuadKills.ToString()),
+                        ("%ACE%", record.Aces.ToString())));
                 }
 
                 player.PrintToChat(FormatChat("{SILVER}####################"));
@@ -628,11 +621,11 @@ public sealed class RezRankPlugin : BasePlugin
         }
         catch (Exception exception)
         {
-            Logger.LogError(exception, "RezRank: failed to display the TOP 5 player leaderboard.");
+            Logger.LogError(exception, "RezRank: failed to display the achievement leaderboard.");
             Server.NextFrame(() =>
             {
                 if (player.IsValid)
-                    player.PrintToChat(FormatChat(_config?.ChatMessages.Error ?? "{RED}Не удалось получить ТОП-5 игроков."));
+                    player.PrintToChat(FormatChat(_config?.ChatMessages.Error ?? "{RED}Не удалось получить топ достижений."));
             });
         }
     }
