@@ -577,8 +577,34 @@ public sealed class RezRankPlugin : BasePlugin
 
             if (!string.Equals(oldRank.Name, newRank.Name, StringComparison.Ordinal))
             {
-                Server.NextFrame(() => Server.PrintToChatAll(
-                    FormatChat(_config.ChatMessages.RankUp, ("%PLAYER%", attackerName), ("%RANK%", newRank.Name))));
+                var lastRank = _config.RankProgression.Ranks
+                    .Where(rank => rank != null)
+                    .OrderBy(rank => rank.MinXp)
+                    .LastOrDefault();
+                var reachedMaximumRank = lastRank != null &&
+                    string.Equals(newRank.Name, lastRank.Name, StringComparison.Ordinal);
+
+                Server.NextFrame(() =>
+                {
+                    if (reachedMaximumRank && _config.Announcements.BroadcastMaxRank)
+                    {
+                        Server.PrintToChatAll(FormatChat(
+                            _config.Announcements.MaxRankReached,
+                            ("%PLAYER%", attackerName),
+                            ("%RANK%", newRank.Name)));
+                        return;
+                    }
+
+                    var player = Utilities.GetPlayers().FirstOrDefault(candidate =>
+                        candidate.IsValid &&
+                        !candidate.IsBot &&
+                        candidate.SteamID.ToString() == attackerSteamId);
+                    player?.PrintToChat(FormatChat(
+                        _config.ChatMessages.RankUp,
+                        ("%PLAYER%", attackerName),
+                        ("%RANK%", newRank.Name)));
+                });
+
                 Logger.LogInformation(
                     "RezRank: {PlayerName} ranked up from {OldRank} to {NewRank} ({Xp} XP).",
                     attackerName,
