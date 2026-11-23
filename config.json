@@ -18,7 +18,9 @@
     "Enabled": true,
     "RankName": "BYPASS",
     "ImagePath": "materials/rezrank/bypass.png",
-    "SteamIds": []
+    "SteamIds": [
+      "76561198000000000"
+    ]
   },
   "RankProgression": {
     "XpPerKill": 10,
