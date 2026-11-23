@@ -112,5 +112,13 @@
     "RankUp": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {GREEN}Поздравляем! Вы получили новый ранг: {BLUE}%RANK%{GREEN}!",
     "NoData": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}Статистика пока не найдена. Сыграйте немного, чтобы создать запись.",
     "Error": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {RED}Не удалось получить статус. Попробуйте позже."
+  },
+  "Achievements": {
+    "Enabled": true,
+    "DoubleKillXp": 5,
+    "TripleKillXp": 10,
+    "QuadKillXp": 20,
+    "AceXp": 35,
+    "Message": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {GOLD}%ACHIEVEMENT%! {GREEN}+%XP% XP"
   }
 }
