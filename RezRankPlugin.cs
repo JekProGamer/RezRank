@@ -153,8 +153,8 @@ public sealed class RezRankPlugin : BasePlugin
 
             if (!string.Equals(oldRank.Name, newRank.Name, StringComparison.Ordinal))
             {
-                Server.PrintToChatAll(
-                    $"[RezRank] {attackerName} получил звание {newRank.Name}!");
+                Server.NextFrame(() => Server.PrintToChatAll(
+                    $"[RezRank] {attackerName} получил звание {newRank.Name}!"));
                 Logger.LogInformation(
                     "RezRank: {PlayerName} ranked up from {OldRank} to {NewRank} ({Xp} XP).",
                     attackerName,
