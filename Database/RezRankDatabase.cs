@@ -238,10 +238,10 @@ public sealed class RezRankDatabase
 
         var achievementColumn = achievementName switch
         {
-            "Double Kill" => "double_kills",
-            "Triple Kill" => "triple_kills",
-            "Quad Kill" => "quad_kills",
-            "Ace" => "aces",
+            "Double Kill" or "Дабл-килл" => "double_kills",
+            "Triple Kill" or "Трипл-килл" => "triple_kills",
+            "Quad Kill" or "Квад-килл" => "quad_kills",
+            "Ace" or "Эйс" => "aces",
             _ => null
         };
 
