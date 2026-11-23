@@ -2,6 +2,7 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Commands;
+using CounterStrikeSharp.API.Modules.Admin;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Logging;
 using RezRank.Configuration;
@@ -266,6 +267,24 @@ public sealed class RezRankPlugin : BasePlugin
             _ = SendLeaderboardAsync(p, _shutdown?.Token ?? CancellationToken.None);
         }));
 
+        // The administration entry is shown only to players with the
+        // CounterStrikeSharp generic admin permission.
+        if (IsRankAdmin(player))
+        {
+            state.Options.Add(new RezRankMenuOption("Администрация", p =>
+            {
+                // Re-check permissions at the moment of selection as well.
+                if (!IsRankAdmin(p))
+                {
+                    CloseRankMenu(p);
+                    return;
+                }
+
+                CloseRankMenu(p);
+                p.PrintToChat(FormatChat("{SILVER}[{ORANGE}RezRank{SILVER}] {YELLOW}Административный раздел будет добавлен следующим шагом."));
+            }, requiresAdmin: true));
+        }
+
         _rankMenus[player.Slot] = state;
         RenderRankMenu(player, state);
     }
@@ -276,6 +295,14 @@ public sealed class RezRankPlugin : BasePlugin
         {
             if (!player.IsValid || !_rankMenus.TryGetValue(player.Slot, out var state))
                 continue;
+
+            // If admin permissions are revoked while the menu is open,
+            // immediately close the menu containing admin-only entries.
+            if (state.Options.Any(option => option.RequiresAdmin) && !IsRankAdmin(player))
+            {
+                CloseRankMenu(player);
+                continue;
+            }
 
             var snapshot = player.Buttons.ToString();
             if (snapshot != state.PreviousButtons)
@@ -862,6 +889,14 @@ public sealed class RezRankPlugin : BasePlugin
             .Replace("{BLUEGREY}", ChatColors.BlueGrey.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
+    private static bool IsRankAdmin(CCSPlayerController player)
+    {
+        return player.IsValid &&
+               !player.IsBot &&
+               !player.IsHLTV &&
+               AdminManager.PlayerHasPermissions(player, "@css/generic");
+    }
+
     private bool IsBypass(string steamId)
     {
         return _config?.Bypass.Enabled == true &&
@@ -946,10 +981,14 @@ public sealed class RezRankPlugin : BasePlugin
 }
 
 
-internal sealed class RezRankMenuOption(string text, Action<CCSPlayerController> action)
+internal sealed class RezRankMenuOption(
+    string text,
+    Action<CCSPlayerController> action,
+    bool requiresAdmin = false)
 {
     public string Text { get; } = text;
     public Action<CCSPlayerController> Action { get; } = action;
+    public bool RequiresAdmin { get; } = requiresAdmin;
 }
 
 internal sealed class RezRankMenuState
