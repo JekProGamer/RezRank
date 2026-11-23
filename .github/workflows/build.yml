@@ -1,0 +1,20 @@
+name: Build RezRank
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore
+        run: dotnet restore RezRank.csproj
+      - name: Build
+        run: dotnet build RezRank.csproj --configuration Release --no-restore
