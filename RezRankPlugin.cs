@@ -338,10 +338,6 @@ public sealed class RezRankPlugin : BasePlugin
                     .OrderBy(r => r.MinXp)
                     .FirstOrDefault();
 
-                var progressText = nextRank == null
-                    ? "Максимальный ранг"
-                    : $"До {nextRank.Name}: {nextRank.MinXp - record.Xp} XP";
-
                 var kd = record.Deaths == 0
                     ? record.Kills.ToString()
                     : ((double)record.Kills / record.Deaths).ToString("0.00");
