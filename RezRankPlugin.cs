@@ -17,6 +17,7 @@ public sealed class RezRankPlugin : BasePlugin
     private RezRankDatabase? _database;
     private CancellationTokenSource? _shutdown;
     private Task _databaseReadyTask = Task.CompletedTask;
+    private readonly HashSet<string> _disconnectingPlayers = new(StringComparer.Ordinal);
 
     public override void Load(bool hotReload)
     {
@@ -49,7 +50,18 @@ public sealed class RezRankPlugin : BasePlugin
 
                 var steamId = player.SteamID.ToString();
                 var playerName = player.PlayerName;
+                _disconnectingPlayers.Remove(steamId);
                 _ = SavePlayerActivityAsync(steamId, playerName, cancellationToken);
+
+                return HookResult.Continue;
+            });
+
+            RegisterEventHandler<EventPlayerDisconnect>((@event, info) =>
+            {
+                // Remember disconnects so a player_death event emitted during
+                // the same disconnect sequence is not counted as an in-game death.
+                if (@event.Xuid != 0)
+                    _disconnectingPlayers.Add(@event.Xuid.ToString());
 
                 return HookResult.Continue;
             });
@@ -60,30 +72,49 @@ public sealed class RezRankPlugin : BasePlugin
                 if (victim == null || !victim.IsValid || victim.IsBot || victim.IsHLTV)
                     return HookResult.Continue;
 
+                // Copy all event data now; game-event objects are only valid
+                // for the duration of this callback.
                 var victimSteamId = victim.SteamID.ToString();
                 var victimName = victim.PlayerName;
                 var attacker = @event.Attacker;
-
-                if (attacker != null &&
+                var hasValidEnemyAttacker =
+                    attacker != null &&
                     attacker.IsValid &&
                     !attacker.IsBot &&
                     !attacker.IsHLTV &&
                     attacker.SteamID != victim.SteamID &&
-                    attacker.TeamNum != victim.TeamNum)
+                    attacker.TeamNum != victim.TeamNum;
+
+                var attackerSteamId = hasValidEnemyAttacker ? attacker!.SteamID.ToString() : string.Empty;
+                var attackerName = hasValidEnemyAttacker ? attacker!.PlayerName : string.Empty;
+
+                // Defer processing by one frame so player_disconnect can mark
+                // the SteamID first if the engine emits both events on exit.
+                Server.NextFrame(() =>
                 {
-                    var attackerSteamId = attacker.SteamID.ToString();
-                    var attackerName = attacker.PlayerName;
-                    _ = ProcessKillAsync(
-                        attackerSteamId,
-                        attackerName,
-                        victimSteamId,
-                        victimName,
-                        cancellationToken);
-                }
-                else
-                {
-                    _ = RecordDeathAsync(victimSteamId, victimName, cancellationToken);
-                }
+                    if (_disconnectingPlayers.Contains(victimSteamId))
+                    {
+                        Logger.LogDebug(
+                            "RezRank: ignored death event for {PlayerName} ({SteamId}) because the player disconnected.",
+                            victimName,
+                            victimSteamId);
+                        return;
+                    }
+
+                    if (hasValidEnemyAttacker)
+                    {
+                        _ = ProcessKillAsync(
+                            attackerSteamId,
+                            attackerName,
+                            victimSteamId,
+                            victimName,
+                            cancellationToken);
+                    }
+                    else
+                    {
+                        _ = RecordDeathAsync(victimSteamId, victimName, cancellationToken);
+                    }
+                });
 
                 return HookResult.Continue;
             });
