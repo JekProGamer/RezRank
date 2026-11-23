@@ -120,9 +120,5 @@
     "QuadKillXp": 20,
     "AceXp": 35,
     "Message": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {GOLD}%ACHIEVEMENT%! {GREEN}+%XP% XP"
-  },
-  "AntiFarm": {
-    "Enabled": true,
-    "SameVictimCooldownMinutes": 10
   }
 }
