@@ -2,8 +2,6 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Commands;
-using CounterStrikeSharp.API.Core.Capabilities;
-using WASDSharedAPI;
 using Microsoft.Extensions.Logging;
 using RezRank.Configuration;
 using RezRank.Database;
@@ -22,6 +20,15 @@ public sealed class RezRankPlugin : BasePlugin
     private CancellationTokenSource? _shutdown;
     private Task _databaseReadyTask = Task.CompletedTask;
     private readonly HashSet<string> _disconnectingPlayers = new(StringComparer.Ordinal);
+    private readonly Dictionary<int, RezRankMenuState> _rankMenus = new();
+    private static readonly Dictionary<string, PlayerButtons> RankMenuButtons = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["W"] = PlayerButtons.Forward,
+        ["S"] = PlayerButtons.Back,
+        ["E"] = PlayerButtons.Use,
+        ["A"] = PlayerButtons.Moveleft,
+        ["R"] = PlayerButtons.Reload
+    };
 
     public override void Load(bool hotReload)
     {
@@ -57,7 +64,8 @@ public sealed class RezRankPlugin : BasePlugin
             _database = new RezRankDatabase(_config.Database);
             _databaseReadyTask = InitializeDatabaseAsync(cancellationToken);
 
-            Logger.LogInformation("RezRank: WASDMenuAPI integration enabled; players can open the menu with !rank.");
+            RegisterListener<Listeners.OnTick>(OnRankMenuTick);
+            Logger.LogInformation("RezRank: internal AdminPlus-style menu enabled; players can open it with !rank.");
 
             if (_config.DatabaseCleanup.Enabled)
                 _ = RunDatabaseCleanupLoopAsync(cancellationToken);
@@ -82,7 +90,12 @@ public sealed class RezRankPlugin : BasePlugin
                 // Remember disconnects so a player_death event emitted during
                 // the same disconnect sequence is not counted as an in-game death.
                 if (@event.Xuid != 0)
+                {
                     _disconnectingPlayers.Add(@event.Xuid.ToString());
+                    var player = @event.Userid;
+                    if (player != null)
+                        _rankMenus.Remove(player.Slot);
+                }
 
                 return HookResult.Continue;
             });
@@ -166,27 +179,124 @@ public sealed class RezRankPlugin : BasePlugin
         if (player == null || !player.IsValid || player.IsBot || player.IsHLTV)
             return;
 
-        var manager = new PluginCapability<IWasdMenuManager>("wasdmenu:manager").Get();
-        if (manager == null)
+        var state = new RezRankMenuState
         {
-            player.PrintToChat("[RezRank] Меню недоступно: WASDMenuAPI не загружен.");
-            return;
+            SelectedIndex = 0,
+            OpenedAtUtc = DateTime.UtcNow,
+            LastInputUtc = DateTime.UtcNow,
+            PreviousButtons = player.Buttons.ToString()
+        };
+        state.Options.Add(new RezRankMenuOption("Статус игрока", p =>
+        {
+            CloseRankMenu(p);
+            _ = SendPlayerStatusAsync(p, includeStats: true, _shutdown?.Token ?? CancellationToken.None);
+        }));
+        state.Options.Add(new RezRankMenuOption("Мой ранг", p =>
+        {
+            CloseRankMenu(p);
+            _ = SendPlayerStatusAsync(p, includeStats: false, _shutdown?.Token ?? CancellationToken.None);
+        }));
+        state.Options.Add(new RezRankMenuOption("Закрыть", p => CloseRankMenu(p)));
+
+        _rankMenus[player.Slot] = state;
+        RenderRankMenu(player, state);
+    }
+
+    private void OnRankMenuTick()
+    {
+        foreach (var player in Utilities.GetPlayers())
+        {
+            if (!player.IsValid || !_rankMenus.TryGetValue(player.Slot, out var state))
+                continue;
+
+            var snapshot = player.Buttons.ToString();
+            if (snapshot != state.PreviousButtons)
+            {
+                state.PreviousButtons = snapshot;
+                if (DateTime.UtcNow - state.OpenedAtUtc >= TimeSpan.FromMilliseconds(400) &&
+                    DateTime.UtcNow - state.LastInputUtc >= TimeSpan.FromMilliseconds(120))
+                {
+                    var buttons = player.Buttons;
+                    bool handled = false;
+
+                    if (HasRankMenuButton("R", buttons))
+                    {
+                        CloseRankMenu(player);
+                        continue;
+                    }
+                    if (HasRankMenuButton("W", buttons))
+                    {
+                        MoveRankMenuSelection(state, -1);
+                        handled = true;
+                    }
+                    else if (HasRankMenuButton("S", buttons))
+                    {
+                        MoveRankMenuSelection(state, 1);
+                        handled = true;
+                    }
+                    else if (HasRankMenuButton("A", buttons))
+                    {
+                        CloseRankMenu(player);
+                        continue;
+                    }
+                    else if (HasRankMenuButton("E", buttons))
+                    {
+                        var option = state.Options[state.SelectedIndex];
+                        option.Action(player);
+                        handled = true;
+                    }
+
+                    if (handled)
+                        state.LastInputUtc = DateTime.UtcNow;
+                }
+            }
+
+            if (_rankMenus.ContainsKey(player.Slot))
+                RenderRankMenu(player, state);
+        }
+    }
+
+    private static bool HasRankMenuButton(string key, PlayerButtons buttons)
+    {
+        return RankMenuButtons.TryGetValue(key, out var mapped) && buttons.HasFlag(mapped);
+    }
+
+    private static void MoveRankMenuSelection(RezRankMenuState state, int direction)
+    {
+        if (state.Options.Count == 0) return;
+        state.SelectedIndex = (state.SelectedIndex + direction + state.Options.Count) % state.Options.Count;
+    }
+
+    private void CloseRankMenu(CCSPlayerController player)
+    {
+        _rankMenus.Remove(player.Slot);
+        if (player.IsValid)
+            player.PrintToCenter(" ");
+    }
+
+    private static void RenderRankMenu(CCSPlayerController player, RezRankMenuState state)
+    {
+        const int visible = 5;
+        int total = state.Options.Count;
+        int selected = Math.Clamp(state.SelectedIndex, 0, Math.Max(0, total - 1));
+        int start = Math.Max(0, selected - visible / 2);
+        if (start + visible > total) start = Math.Max(0, total - visible);
+        int end = Math.Min(total, start + visible);
+
+        var html = new System.Text.StringBuilder();
+        html.Append($"<b><font color='red' class='fontSize-m'>RezRank — меню игрока</font></b> <font color='yellow' class='fontSize-sm'>{selected + 1}</font>/<font color='orange' class='fontSize-sm'>{total}</font><br>");
+        for (int i = start; i < end; i++)
+        {
+            bool isSelected = i == selected;
+            string color = isSelected ? "#9acd32" : "white";
+            if (isSelected)
+                html.Append($"<b><font color='yellow'>►[</font> <font color='{color}' class='fontSize-m'>{state.Options[i].Text}</font> <font color='yellow'>]◄</font></b><br>");
+            else
+                html.Append($"<font color='{color}' class='fontSize-m'>{state.Options[i].Text}</font><br>");
         }
 
-        var menu = manager.CreateMenu("RezRank — меню игрока");
-        menu.Add("Статус (вывести в чат)", (p, option) =>
-        {
-            manager.CloseMenu(p);
-            _ = SendPlayerStatusAsync(p, includeStats: true, _shutdown?.Token ?? CancellationToken.None);
-        });
-        menu.Add("Мой ранг", (p, option) =>
-        {
-            manager.CloseMenu(p);
-            _ = SendPlayerStatusAsync(p, includeStats: false, _shutdown?.Token ?? CancellationToken.None);
-        });
-        menu.Add("Закрыть", (p, option) => manager.CloseMenu(p));
-
-        manager.OpenMainMenu(player, menu);
+        html.Append("<font color='#ff3333' class='fontSize-sm'>Навигация: <font color='#f5a142'>[W/S]</font> | Выбрать: <font color='#f5a142'>[E]</font> | Назад: <font color='#f5a142'>[A]</font> | Выход: <font color='#f5a142'>[R]</font></font>");
+        player.PrintToCenterHtml(html.ToString());
     }
 
     private async Task SendPlayerStatusAsync(
@@ -439,4 +549,20 @@ public sealed class RezRankPlugin : BasePlugin
             throw;
         }
     }
+}
+
+
+internal sealed class RezRankMenuOption(string text, Action<CCSPlayerController> action)
+{
+    public string Text { get; } = text;
+    public Action<CCSPlayerController> Action { get; } = action;
+}
+
+internal sealed class RezRankMenuState
+{
+    public List<RezRankMenuOption> Options { get; } = new();
+    public int SelectedIndex { get; set; }
+    public DateTime OpenedAtUtc { get; set; }
+    public DateTime LastInputUtc { get; set; }
+    public string PreviousButtons { get; set; } = string.Empty;
 }
