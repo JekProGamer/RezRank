@@ -30,10 +30,77 @@ public sealed class RezRankDatabase
                 PRIMARY KEY (steam_id),
                 INDEX idx_last_activity (last_activity)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+            CREATE TABLE IF NOT EXISTS rezrank_kill_pairs (
+                attacker_steam_id VARCHAR(32) NOT NULL,
+                victim_steam_id VARCHAR(32) NOT NULL,
+                last_reward DATETIME(6) NOT NULL,
+                PRIMARY KEY (attacker_steam_id, victim_steam_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
             """;
 
         await using var command = new MySqlCommand(sql, connection);
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task<bool> TryClaimKillRewardAsync(
+        string attackerSteamId,
+        string victimSteamId,
+        int cooldownMinutes,
+        CancellationToken cancellationToken = default)
+    {
+        if (cooldownMinutes < 0)
+            throw new ArgumentOutOfRangeException(nameof(cooldownMinutes));
+
+        await using var connection = new MySqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        const string insertSql = """
+            INSERT IGNORE INTO rezrank_kill_pairs
+                (attacker_steam_id, victim_steam_id, last_reward)
+            VALUES (@attackerSteamId, @victimSteamId, '1970-01-01 00:00:00.000000');
+            """;
+        await using (var insert = new MySqlCommand(insertSql, connection, transaction))
+        {
+            insert.Parameters.AddWithValue("@attackerSteamId", attackerSteamId);
+            insert.Parameters.AddWithValue("@victimSteamId", victimSteamId);
+            await insert.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        const string selectSql = """
+            SELECT last_reward
+            FROM rezrank_kill_pairs
+            WHERE attacker_steam_id = @attackerSteamId
+              AND victim_steam_id = @victimSteamId
+            FOR UPDATE;
+            """;
+        DateTime lastReward;
+        await using (var select = new MySqlCommand(selectSql, connection, transaction))
+        {
+            select.Parameters.AddWithValue("@attackerSteamId", attackerSteamId);
+            select.Parameters.AddWithValue("@victimSteamId", victimSteamId);
+            lastReward = Convert.ToDateTime(await select.ExecuteScalarAsync(cancellationToken));
+        }
+
+        var now = DateTime.UtcNow;
+        var canReward = cooldownMinutes == 0 || lastReward <= now.AddMinutes(-cooldownMinutes);
+        if (canReward)
+        {
+            const string updateSql = """
+                UPDATE rezrank_kill_pairs
+                SET last_reward = UTC_TIMESTAMP(6)
+                WHERE attacker_steam_id = @attackerSteamId
+                  AND victim_steam_id = @victimSteamId;
+                """;
+            await using var update = new MySqlCommand(updateSql, connection, transaction);
+            update.Parameters.AddWithValue("@attackerSteamId", attackerSteamId);
+            update.Parameters.AddWithValue("@victimSteamId", victimSteamId);
+            await update.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return canReward;
     }
 
     public async Task<PlayerRecord?> GetPlayerAsync(string steamId, CancellationToken cancellationToken = default)
