@@ -656,9 +656,11 @@ public sealed class RezRankPlugin : BasePlugin
         foreach (var (token, value) in replacements)
             template = template.Replace(token, value, StringComparison.Ordinal);
 
-        // PrintToChat does not parse {COLOR} text tags. Convert them to the
-        // control characters understood by CounterStrikeSharp's chat renderer.
-        return template
+        // Keep a leading space before the first color control character.
+        // In CS2 chat, a color code at character zero can be consumed as the
+        // message's initial control byte, leaving the first visible text white.
+        // PrintToChat does not parse {COLOR} tags, so convert them to CSS codes.
+        return " " + template
             .Replace("{DEFAULT}", ChatColors.Default.ToString(), StringComparison.OrdinalIgnoreCase)
             .Replace("{WHITE}", ChatColors.White.ToString(), StringComparison.OrdinalIgnoreCase)
             .Replace("{SILVER}", ChatColors.Silver.ToString(), StringComparison.OrdinalIgnoreCase)
