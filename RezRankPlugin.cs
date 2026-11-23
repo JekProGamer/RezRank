@@ -1,5 +1,4 @@
 using CounterStrikeSharp.API.Core;
-using Newtonsoft.Json;
 using RezRank.Configuration;
 using RezRank.Database;
 
