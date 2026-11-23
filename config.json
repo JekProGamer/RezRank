@@ -99,13 +99,17 @@
       }
     ]
   },
+  "Announcements": {
+    "BroadcastMaxRank": true,
+    "MaxRankReached": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {GOLD}Уважаемый игрок {WHITE}%PLAYER% {GOLD}достиг последнего ранга {BLUE}%RANK%{GOLD}! Поздравляем!"
+  },
   "ChatMessages": {
     "YourRank": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}Ваш ранг: {BLUE}%RANK% {SILVER}| {YELLOW}XP: {GREEN}%XP%",
     "PlayerStatus": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}Статус: {BLUE}%RANK% {SILVER}| {YELLOW}XP: {GREEN}%XP%",
     "PlayerStats": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}Убийства: {GREEN}%KILLS% {SILVER}| {WHITE}Смерти: {RED}%DEATHS% {SILVER}| {WHITE}K/D: {YELLOW}%KD%",
     "NextRank": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}До {BLUE}%NEXT_RANK%: {GREEN}%XP_LEFT% XP",
     "MaxRank": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {GREEN}У вас максимальный ранг!",
-    "RankUp": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}%PLAYER% получил звание {BLUE}%RANK%{WHITE}!",
+    "RankUp": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {GREEN}Поздравляем! Вы получили новый ранг: {BLUE}%RANK%{GREEN}!",
     "NoData": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}Статистика пока не найдена. Сыграйте немного, чтобы создать запись.",
     "Error": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {RED}Не удалось получить статус. Попробуйте позже."
   }
