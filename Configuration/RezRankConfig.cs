@@ -11,7 +11,6 @@ public sealed class RezRankConfig
     public AnnouncementsConfig Announcements { get; set; } = new();
     public ChatMessagesConfig ChatMessages { get; set; } = new();
     public KillStreakAchievementsConfig Achievements { get; set; } = new();
-    public AntiFarmConfig AntiFarm { get; set; } = new();
 
     public static RezRankConfig Load(string path)
     {
@@ -113,12 +112,6 @@ public sealed class RankDefinition
     public long MinXp { get; set; }
 }
 
-
-public sealed class AntiFarmConfig
-{
-    public bool Enabled { get; set; } = true;
-    public int SameVictimCooldownMinutes { get; set; } = 10;
-}
 
 public sealed class KillStreakAchievementsConfig
 {
