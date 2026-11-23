@@ -245,15 +245,10 @@ public sealed class RezRankPlugin : BasePlugin
             LastInputUtc = DateTime.UtcNow,
             PreviousButtons = player.Buttons.ToString()
         };
-        state.Options.Add(new RezRankMenuOption("Статус игрока", p =>
-        {
-            CloseRankMenu(p);
-            _ = SendPlayerStatusAsync(p, includeStats: true, _shutdown?.Token ?? CancellationToken.None);
-        }));
         state.Options.Add(new RezRankMenuOption("Мой ранг", p =>
         {
             CloseRankMenu(p);
-            _ = SendPlayerStatusAsync(p, includeStats: false, _shutdown?.Token ?? CancellationToken.None);
+            _ = SendPlayerStatusAsync(p, includeStats: true, _shutdown?.Token ?? CancellationToken.None);
         }));
         state.Options.Add(new RezRankMenuOption("Следующий Ранг", p =>
         {
@@ -400,16 +395,6 @@ public sealed class RezRankPlugin : BasePlugin
                 var isBypass = IsBypass(steamId);
                 var rank = isBypass ? _config.Bypass.RankName : GetRank(record.Xp).Name;
 
-                if (!includeStats)
-                {
-                    player.PrintToChat(FormatChat("{SILVER}####################"));
-                player.PrintToChat(FormatChat("{GOLD}       МОЙ РАНГ"));
-                player.PrintToChat(FormatChat("{SILVER}####################"));
-                player.PrintToChat(FormatChat(_config.ChatMessages.YourRank, ("%RANK%", rank), ("%XP%", record.Xp.ToString())));
-                player.PrintToChat(FormatChat("{SILVER}####################"));
-                    return;
-                }
-
                 var nextRank = _config.RankProgression.Ranks
                     .Where(r => r != null && r.MinXp > record.Xp)
                     .OrderBy(r => r.MinXp)
@@ -420,9 +405,9 @@ public sealed class RezRankPlugin : BasePlugin
                     : ((double)record.Kills / record.Deaths).ToString("0.00");
 
                 player.PrintToChat(FormatChat("{SILVER}####################"));
-                player.PrintToChat(FormatChat("{GOLD}     СТАТУС ИГРОКА"));
+                player.PrintToChat(FormatChat("{GOLD}          МОЙ РАНГ"));
                 player.PrintToChat(FormatChat("{SILVER}####################"));
-                player.PrintToChat(FormatChat(_config.ChatMessages.PlayerStatus, ("%RANK%", rank), ("%XP%", record.Xp.ToString())));
+                player.PrintToChat(FormatChat(_config.ChatMessages.YourRank, ("%RANK%", rank), ("%XP%", record.Xp.ToString())));
                 player.PrintToChat(FormatChat(_config.ChatMessages.PlayerStats,
                     ("%KILLS%", record.Kills.ToString()),
                     ("%DEATHS%", record.Deaths.ToString()),
