@@ -197,6 +197,11 @@ public sealed class RezRankPlugin : BasePlugin
             CloseRankMenu(p);
             _ = SendPlayerStatusAsync(p, includeStats: false, _shutdown?.Token ?? CancellationToken.None);
         }));
+        state.Options.Add(new RezRankMenuOption("Прогресс до следующего ранга", p =>
+        {
+            CloseRankMenu(p);
+            _ = SendRankProgressAsync(p, _shutdown?.Token ?? CancellationToken.None);
+        }));
 
         _rankMenus[player.Slot] = state;
         RenderRankMenu(player, state);
@@ -363,6 +368,68 @@ public sealed class RezRankPlugin : BasePlugin
         catch (Exception exception)
         {
             Logger.LogError(exception, "RezRank: failed to display player status.");
+            Server.NextFrame(() =>
+            {
+                if (player.IsValid)
+                    player.PrintToChat(FormatChat(_config?.ChatMessages.Error ?? "{RED}Не удалось получить статус."));
+            });
+        }
+    }
+
+    private async Task SendRankProgressAsync(
+        CCSPlayerController player,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (_database == null || _config == null)
+                return;
+
+            var steamId = player.SteamID.ToString();
+            await _databaseReadyTask;
+            var record = await _database.GetPlayerAsync(steamId, cancellationToken);
+
+            Server.NextFrame(() =>
+            {
+                if (!player.IsValid || player.SteamID.ToString() != steamId)
+                    return;
+
+                if (record == null)
+                {
+                    player.PrintToChat(FormatChat(_config.ChatMessages.NoData));
+                    return;
+                }
+
+                var rank = IsBypass(steamId) ? _config.Bypass.RankName : GetRank(record.Xp).Name;
+                player.PrintToChat(FormatChat(
+                    _config.ChatMessages.PlayerStatus,
+                    ("%RANK%", rank),
+                    ("%XP%", record.Xp.ToString())));
+
+                var nextRank = _config.RankProgression.Ranks
+                    .Where(r => r != null && r.MinXp > record.Xp)
+                    .OrderBy(r => r.MinXp)
+                    .FirstOrDefault();
+
+                if (nextRank == null)
+                {
+                    player.PrintToChat(FormatChat(_config.ChatMessages.MaxRank));
+                    return;
+                }
+
+                player.PrintToChat(FormatChat(
+                    _config.ChatMessages.NextRank,
+                    ("%NEXT_RANK%", nextRank.Name),
+                    ("%XP_LEFT%", (nextRank.MinXp - record.Xp).ToString())));
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            // Plugin is unloading.
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "RezRank: failed to display rank progress.");
             Server.NextFrame(() =>
             {
                 if (player.IsValid)
