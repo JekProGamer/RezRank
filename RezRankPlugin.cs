@@ -807,7 +807,7 @@ public sealed class RezRankPlugin : BasePlugin
             // Matchmaking skillgroup type (12) supports custom skillgroup IDs.
             // FakeRank uses UserMessage 350 to force the updated badge to clients.
             const sbyte matchmakingRankType = 12;
-            var competitiveRanking = 19 + rankIndex;
+            var competitiveRanking = 1 + rankIndex;
 
             if (player.CompetitiveRankType == matchmakingRankType &&
                 player.CompetitiveRanking == competitiveRanking)
