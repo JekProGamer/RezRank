@@ -31,71 +31,71 @@
       },
       {
         "Name": "Silver II",
-        "MinXp": 250
+        "MinXp": 100
       },
       {
         "Name": "Silver III",
-        "MinXp": 600
+        "MinXp": 250
       },
       {
         "Name": "Silver IV",
-        "MinXp": 1000
+        "MinXp": 450
       },
       {
         "Name": "Silver Elite",
-        "MinXp": 1500
+        "MinXp": 700
       },
       {
         "Name": "Silver Elite Master",
-        "MinXp": 2100
+        "MinXp": 1000
       },
       {
         "Name": "Gold Nova I",
-        "MinXp": 2900
+        "MinXp": 1400
       },
       {
         "Name": "Gold Nova II",
-        "MinXp": 3900
+        "MinXp": 1900
       },
       {
         "Name": "Gold Nova III",
-        "MinXp": 5100
+        "MinXp": 2500
       },
       {
         "Name": "Gold Nova Master",
-        "MinXp": 6500
+        "MinXp": 3300
       },
       {
         "Name": "Master Guardian I",
-        "MinXp": 8200
+        "MinXp": 4300
       },
       {
         "Name": "Master Guardian II",
-        "MinXp": 10200
+        "MinXp": 5600
       },
       {
         "Name": "Master Guardian Elite",
-        "MinXp": 12500
+        "MinXp": 7400
       },
       {
         "Name": "Distinguished Master Guardian",
-        "MinXp": 15000
+        "MinXp": 9800
       },
       {
         "Name": "Legendary Eagle",
-        "MinXp": 17800
+        "MinXp": 13000
       },
       {
         "Name": "Legendary Eagle Master",
-        "MinXp": 20800
+        "MinXp": 17500
       },
       {
         "Name": "Supreme Master First Class",
-        "MinXp": 24200
+        "MinXp": 24000
       },
       {
         "Name": "The Global Elite",
-        "MinXp": 28000
+        "MinXp": 34000
       }
     ]
   },

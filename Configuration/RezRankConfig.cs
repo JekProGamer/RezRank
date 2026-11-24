@@ -86,23 +86,23 @@ public sealed class RankProgressionConfig
     public List<RankDefinition> Ranks { get; set; } = new()
     {
         new() { Name = "Silver I", MinXp = 0 },
-        new() { Name = "Silver II", MinXp = 250 },
-        new() { Name = "Silver III", MinXp = 600 },
-        new() { Name = "Silver IV", MinXp = 1000 },
-        new() { Name = "Silver Elite", MinXp = 1500 },
-        new() { Name = "Silver Elite Master", MinXp = 2100 },
-        new() { Name = "Gold Nova I", MinXp = 2900 },
-        new() { Name = "Gold Nova II", MinXp = 3900 },
-        new() { Name = "Gold Nova III", MinXp = 5100 },
-        new() { Name = "Gold Nova Master", MinXp = 6500 },
-        new() { Name = "Master Guardian I", MinXp = 8200 },
-        new() { Name = "Master Guardian II", MinXp = 10200 },
-        new() { Name = "Master Guardian Elite", MinXp = 12500 },
-        new() { Name = "Distinguished Master Guardian", MinXp = 15000 },
-        new() { Name = "Legendary Eagle", MinXp = 17800 },
-        new() { Name = "Legendary Eagle Master", MinXp = 20800 },
-        new() { Name = "Supreme Master First Class", MinXp = 24200 },
-        new() { Name = "The Global Elite", MinXp = 28000 }
+        new() { Name = "Silver II", MinXp = 100 },
+        new() { Name = "Silver III", MinXp = 250 },
+        new() { Name = "Silver IV", MinXp = 450 },
+        new() { Name = "Silver Elite", MinXp = 700 },
+        new() { Name = "Silver Elite Master", MinXp = 1000 },
+        new() { Name = "Gold Nova I", MinXp = 1400 },
+        new() { Name = "Gold Nova II", MinXp = 1900 },
+        new() { Name = "Gold Nova III", MinXp = 2500 },
+        new() { Name = "Gold Nova Master", MinXp = 3300 },
+        new() { Name = "Master Guardian I", MinXp = 4300 },
+        new() { Name = "Master Guardian II", MinXp = 5600 },
+        new() { Name = "Master Guardian Elite", MinXp = 7400 },
+        new() { Name = "Distinguished Master Guardian", MinXp = 9800 },
+        new() { Name = "Legendary Eagle", MinXp = 13000 },
+        new() { Name = "Legendary Eagle Master", MinXp = 17500 },
+        new() { Name = "Supreme Master First Class", MinXp = 24000 },
+        new() { Name = "The Global Elite", MinXp = 34000 }
     };
 }
 
