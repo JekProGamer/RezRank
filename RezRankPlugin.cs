@@ -128,7 +128,7 @@ public sealed class RezRankPlugin : BasePlugin
 
                     _killStreaks.Remove(@event.Xuid.ToString());
                     _streakVictims.Remove(@event.Xuid.ToString());
-                    _onlineTabRanks.Remove(@event.Xuid.ToString());
+                    _onlineTabRanks.TryRemove(@event.Xuid.ToString(), out _);
                 }
 
                 return HookResult.Continue;
