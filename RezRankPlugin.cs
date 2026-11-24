@@ -27,6 +27,7 @@ public sealed class RezRankPlugin : BasePlugin
     private readonly Dictionary<int, RezRankMenuState> _rankMenus = new();
     private readonly Dictionary<string, int> _killStreaks = new(StringComparer.Ordinal);
     private readonly Dictionary<string, HashSet<string>> _streakVictims = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> _onlineTabRanks = new(StringComparer.Ordinal);
     private readonly Dictionary<string, PendingAdminXpChange> _pendingAdminXp = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, PlayerButtons> RankMenuButtons = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -78,6 +79,7 @@ public sealed class RezRankPlugin : BasePlugin
             _databaseReadyTask = InitializeDatabaseAsync(cancellationToken);
 
             RegisterListener<Listeners.OnTick>(OnRankMenuTick);
+            RegisterListener<Listeners.OnTick>(OnCompetitiveRankTick);
             Logger.LogInformation("RezRank: internal AdminPlus-style menu enabled; players can open it with !rank.");
 
             if (_config.DatabaseCleanup.Enabled)
@@ -112,6 +114,7 @@ public sealed class RezRankPlugin : BasePlugin
 
                     _killStreaks.Remove(@event.Xuid.ToString());
                     _streakVictims.Remove(@event.Xuid.ToString());
+                    _onlineTabRanks.Remove(@event.Xuid.ToString());
                 }
 
                 return HookResult.Continue;
@@ -786,41 +789,50 @@ public sealed class RezRankPlugin : BasePlugin
 
     private void UpdateOnlineTabRank(string steamId, long xp)
     {
-        Server.NextFrame(() =>
+        if (_config == null)
+            return;
+
+        var rankIndex = IsBypass(steamId)
+            ? 17
+            : _config.RankProgression.Ranks
+                .Where(rank => rank != null)
+                .OrderBy(rank => rank.MinXp)
+                .TakeWhile(rank => rank.MinXp <= xp)
+                .Count() - 1;
+
+        var competitiveRanking = 1 + Math.Clamp(rankIndex, 0, 17);
+
+        // Cache the desired standard CS2 competitive rank (Silver I = 1, Global Elite = 18).
+        // The tick listener reapplies it if the game overwrites the player's rank fields.
+        Server.NextFrame(() => _onlineTabRanks[steamId] = competitiveRanking);
+    }
+
+    private void OnCompetitiveRankTick()
+    {
+        const sbyte competitiveRankType = 12;
+        var recipients = new RecipientFilter();
+
+        foreach (var player in Utilities.GetPlayers())
         {
-            var player = Utilities.GetPlayers().FirstOrDefault(candidate =>
-                candidate.IsValid && !candidate.IsBot && !candidate.IsHLTV &&
-                candidate.SteamID.ToString() == steamId);
-            if (player == null)
-                return;
+            if (!player.IsValid || player.IsBot || player.IsHLTV)
+                continue;
 
-            var rankIndex = IsBypass(steamId)
-                ? 17
-                : _config!.RankProgression.Ranks
-                    .Where(rank => rank != null)
-                    .OrderBy(rank => rank.MinXp)
-                    .TakeWhile(rank => rank.MinXp <= xp)
-                    .Count() - 1;
+            var steamId = player.SteamID.ToString();
+            if (!_onlineTabRanks.TryGetValue(steamId, out var competitiveRanking))
+                continue;
 
-            rankIndex = Math.Clamp(rankIndex, 0, 17);
-
-            // Matchmaking skillgroup type (12) supports custom skillgroup IDs.
-            // FakeRank uses UserMessage 350 to force the updated badge to clients.
-            const sbyte matchmakingRankType = 12;
-            var competitiveRanking = 1 + rankIndex;
-
-            if (player.CompetitiveRankType == matchmakingRankType &&
+            if (player.CompetitiveRankType == competitiveRankType &&
                 player.CompetitiveRanking == competitiveRanking)
-                return;
+                continue;
 
             player.CompetitiveWins = 777;
-            player.CompetitiveRankType = matchmakingRankType;
+            player.CompetitiveRankType = competitiveRankType;
             player.CompetitiveRanking = competitiveRanking;
-
-            var recipients = new RecipientFilter();
             recipients.Add(player);
+        }
+
+        if (recipients.Count > 0)
             UserMessage.FromId(350).Send(recipients);
-        });
     }
 
     private async Task ProcessKillAsync(
