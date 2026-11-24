@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
@@ -27,7 +28,7 @@ public sealed class RezRankPlugin : BasePlugin
     private readonly Dictionary<int, RezRankMenuState> _rankMenus = new();
     private readonly Dictionary<string, int> _killStreaks = new(StringComparer.Ordinal);
     private readonly Dictionary<string, HashSet<string>> _streakVictims = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, int> _onlineTabRanks = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, int> _onlineTabRanks = new(StringComparer.Ordinal);
     private readonly Dictionary<string, PendingAdminXpChange> _pendingAdminXp = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, PlayerButtons> RankMenuButtons = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -80,6 +81,19 @@ public sealed class RezRankPlugin : BasePlugin
 
             RegisterListener<Listeners.OnTick>(OnRankMenuTick);
             RegisterListener<Listeners.OnTick>(OnCompetitiveRankTick);
+
+            // EventPlayerConnectFull is not raised again for players already online
+            // when the plugin is loaded or hot-reloaded. Seed their TAB ranks too.
+            foreach (var onlinePlayer in Utilities.GetPlayers())
+            {
+                if (!onlinePlayer.IsValid || onlinePlayer.IsBot || onlinePlayer.IsHLTV)
+                    continue;
+
+                _ = RefreshTabRankAfterConnectAsync(
+                    onlinePlayer.SteamID.ToString(),
+                    onlinePlayer.PlayerName,
+                    cancellationToken);
+            }
             Logger.LogInformation("RezRank: internal AdminPlus-style menu enabled; players can open it with !rank.");
 
             if (_config.DatabaseCleanup.Enabled)
@@ -805,6 +819,11 @@ public sealed class RezRankPlugin : BasePlugin
         // Cache the desired standard CS2 competitive rank (Silver I = 1, Global Elite = 18).
         // The tick listener reapplies it if the game overwrites the player's rank fields.
         Server.NextFrame(() => _onlineTabRanks[steamId] = competitiveRanking);
+        Logger.LogDebug(
+            "RezRank: queued TAB rank {CompetitiveRanking} for {SteamId} (XP: {Xp}).",
+            competitiveRanking,
+            steamId,
+            xp);
     }
 
     private void OnCompetitiveRankTick()
