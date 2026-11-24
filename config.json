@@ -23,7 +23,7 @@
     ]
   },
   "RankProgression": {
-    "XpPerKill": 10,
+    "XpPerKill": 5,
     "Ranks": [
       {
         "Name": "Silver I",
@@ -31,71 +31,71 @@
       },
       {
         "Name": "Silver II",
-        "MinXp": 100
-      },
-      {
-        "Name": "Silver III",
         "MinXp": 250
       },
       {
+        "Name": "Silver III",
+        "MinXp": 600
+      },
+      {
         "Name": "Silver IV",
-        "MinXp": 450
-      },
-      {
-        "Name": "Silver Elite",
-        "MinXp": 700
-      },
-      {
-        "Name": "Silver Elite Master",
         "MinXp": 1000
       },
       {
+        "Name": "Silver Elite",
+        "MinXp": 1500
+      },
+      {
+        "Name": "Silver Elite Master",
+        "MinXp": 2100
+      },
+      {
         "Name": "Gold Nova I",
-        "MinXp": 1400
+        "MinXp": 2900
       },
       {
         "Name": "Gold Nova II",
-        "MinXp": 1900
+        "MinXp": 3900
       },
       {
         "Name": "Gold Nova III",
-        "MinXp": 2500
+        "MinXp": 5100
       },
       {
         "Name": "Gold Nova Master",
-        "MinXp": 3200
+        "MinXp": 6500
       },
       {
         "Name": "Master Guardian I",
-        "MinXp": 4000
+        "MinXp": 8200
       },
       {
         "Name": "Master Guardian II",
-        "MinXp": 5000
+        "MinXp": 10200
       },
       {
         "Name": "Master Guardian Elite",
-        "MinXp": 6200
+        "MinXp": 12500
       },
       {
         "Name": "Distinguished Master Guardian",
-        "MinXp": 7600
+        "MinXp": 15000
       },
       {
         "Name": "Legendary Eagle",
-        "MinXp": 9200
+        "MinXp": 17800
       },
       {
         "Name": "Legendary Eagle Master",
-        "MinXp": 11000
+        "MinXp": 20800
       },
       {
         "Name": "Supreme Master First Class",
-        "MinXp": 13000
+        "MinXp": 24200
       },
       {
         "Name": "The Global Elite",
-        "MinXp": 15500
+        "MinXp": 28000
       }
     ]
   },
@@ -115,10 +115,10 @@
   },
   "Achievements": {
     "Enabled": true,
-    "DoubleKillXp": 5,
-    "TripleKillXp": 10,
-    "QuadKillXp": 20,
-    "AceXp": 35,
+    "DoubleKillXp": 2,
+    "TripleKillXp": 4,
+    "QuadKillXp": 6,
+    "AceXp": 10,
     "Message": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {GOLD}%ACHIEVEMENT%! {GREEN}+%XP% XP"
   }
 }
