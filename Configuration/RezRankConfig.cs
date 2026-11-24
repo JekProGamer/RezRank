@@ -81,28 +81,28 @@ public sealed class BypassConfig
 
 public sealed class RankProgressionConfig
 {
-    public int XpPerKill { get; set; } = 10;
+    public int XpPerKill { get; set; } = 5;
 
     public List<RankDefinition> Ranks { get; set; } = new()
     {
         new() { Name = "Silver I", MinXp = 0 },
-        new() { Name = "Silver II", MinXp = 100 },
-        new() { Name = "Silver III", MinXp = 250 },
-        new() { Name = "Silver IV", MinXp = 450 },
-        new() { Name = "Silver Elite", MinXp = 700 },
-        new() { Name = "Silver Elite Master", MinXp = 1000 },
-        new() { Name = "Gold Nova I", MinXp = 1400 },
-        new() { Name = "Gold Nova II", MinXp = 1900 },
-        new() { Name = "Gold Nova III", MinXp = 2500 },
-        new() { Name = "Gold Nova Master", MinXp = 3200 },
-        new() { Name = "Master Guardian I", MinXp = 4000 },
-        new() { Name = "Master Guardian II", MinXp = 5000 },
-        new() { Name = "Master Guardian Elite", MinXp = 6200 },
-        new() { Name = "Distinguished Master Guardian", MinXp = 7600 },
-        new() { Name = "Legendary Eagle", MinXp = 9200 },
-        new() { Name = "Legendary Eagle Master", MinXp = 11000 },
-        new() { Name = "Supreme Master First Class", MinXp = 13000 },
-        new() { Name = "The Global Elite", MinXp = 15500 }
+        new() { Name = "Silver II", MinXp = 250 },
+        new() { Name = "Silver III", MinXp = 600 },
+        new() { Name = "Silver IV", MinXp = 1000 },
+        new() { Name = "Silver Elite", MinXp = 1500 },
+        new() { Name = "Silver Elite Master", MinXp = 2100 },
+        new() { Name = "Gold Nova I", MinXp = 2900 },
+        new() { Name = "Gold Nova II", MinXp = 3900 },
+        new() { Name = "Gold Nova III", MinXp = 5100 },
+        new() { Name = "Gold Nova Master", MinXp = 6500 },
+        new() { Name = "Master Guardian I", MinXp = 8200 },
+        new() { Name = "Master Guardian II", MinXp = 10200 },
+        new() { Name = "Master Guardian Elite", MinXp = 12500 },
+        new() { Name = "Distinguished Master Guardian", MinXp = 15000 },
+        new() { Name = "Legendary Eagle", MinXp = 17800 },
+        new() { Name = "Legendary Eagle Master", MinXp = 20800 },
+        new() { Name = "Supreme Master First Class", MinXp = 24200 },
+        new() { Name = "The Global Elite", MinXp = 28000 }
     };
 }
 
@@ -116,10 +116,10 @@ public sealed class RankDefinition
 public sealed class KillStreakAchievementsConfig
 {
     public bool Enabled { get; set; } = true;
-    public int DoubleKillXp { get; set; } = 5;
-    public int TripleKillXp { get; set; } = 10;
-    public int QuadKillXp { get; set; } = 20;
-    public int AceXp { get; set; } = 35;
+    public int DoubleKillXp { get; set; } = 2;
+    public int TripleKillXp { get; set; } = 4;
+    public int QuadKillXp { get; set; } = 6;
+    public int AceXp { get; set; } = 10;
     public string Message { get; set; } =
         "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {GOLD}%ACHIEVEMENT%! {GREEN}+%XP% XP";
 }
