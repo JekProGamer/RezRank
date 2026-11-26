@@ -1018,6 +1018,7 @@ public sealed class RezRankPlugin : BasePlugin
         AddXp,
         RemoveXp,
         SetXp,
+        SetRank,
         ResetProgress,
         PlayerInfo
     }
@@ -1063,6 +1064,11 @@ public sealed class RezRankPlugin : BasePlugin
         {
             CloseRankMenu(p);
             OpenAdminPlayerSelection(p, AdminAction.ResetProgress);
+        }, requiresAdmin: true));
+        state.Options.Add(new RezRankMenuOption("Выдать звание", p =>
+        {
+            CloseRankMenu(p);
+            OpenAdminPlayerSelection(p, AdminAction.SetRank);
         }, requiresAdmin: true));
         state.Options.Add(new RezRankMenuOption("Информация об игроке", p =>
         {
@@ -1110,24 +1116,21 @@ public sealed class RezRankPlugin : BasePlugin
                     return;
                 }
 
-                CloseRankMenu(p);
                 if (action is AdminAction.AddXp or AdminAction.RemoveXp or AdminAction.SetXp)
                 {
-                    _pendingAdminXp[p.SteamID.ToString()] =
-                        new PendingAdminXpChange(targetSteamId, targetName, action);
-                    var actionText = action switch
-                    {
-                        AdminAction.AddXp => "выдать",
-                        AdminAction.RemoveXp => "снять",
-                        _ => "установить"
-                    };
-                    p.PrintToChat(FormatChat(
-                        "{SILVER}[{ORANGE}RezRank{SILVER}] {YELLOW}Игрок: {GREEN}%PLAYER%. {YELLOW}Введи количество XP командой {ORANGE}!rankamount <число>{YELLOW}, чтобы %ACTION% XP.",
-                        ("%PLAYER%", targetName),
-                        ("%ACTION%", actionText)));
+                    OpenAdminXpAmountSelection(
+                        p,
+                        new PendingAdminXpChange(targetSteamId, targetName, action));
                     return;
                 }
 
+                if (action == AdminAction.SetRank)
+                {
+                    OpenAdminRankSelection(p, targetSteamId, targetName);
+                    return;
+                }
+
+                CloseRankMenu(p);
                 if (action == AdminAction.ResetProgress)
                     _ = ResetAdminPlayerProgressAsync(p, targetSteamId, targetName, _shutdown?.Token ?? CancellationToken.None);
                 else
@@ -1143,6 +1146,155 @@ public sealed class RezRankPlugin : BasePlugin
 
         _rankMenus[admin.Slot] = state;
         RenderRankMenu(admin, state);
+    }
+
+    private void OpenAdminXpAmountSelection(
+        CCSPlayerController admin,
+        PendingAdminXpChange pending)
+    {
+        if (!IsRankAdmin(admin))
+        {
+            CloseRankMenu(admin);
+            return;
+        }
+
+        var state = new RezRankMenuState
+        {
+            Title = $"RezRank — XP для {pending.TargetName}",
+            SelectedIndex = 0,
+            OpenedAtUtc = DateTime.UtcNow,
+            LastInputUtc = DateTime.UtcNow,
+            PreviousButtons = admin.Buttons.ToString()
+        };
+
+        foreach (var amount in new long[] { 30, 100, 200 })
+        {
+            var selectedAmount = amount;
+            state.Options.Add(new RezRankMenuOption($"{selectedAmount} XP", p =>
+            {
+                if (!IsRankAdmin(p))
+                {
+                    CloseRankMenu(p);
+                    return;
+                }
+
+                _ = ApplyAdminXpAmountAsync(
+                    p,
+                    pending,
+                    selectedAmount,
+                    _shutdown?.Token ?? CancellationToken.None);
+                OpenAdminMenu(p);
+            }, requiresAdmin: true));
+        }
+
+        state.Options.Add(new RezRankMenuOption("Назад", p =>
+        {
+            OpenAdminPlayerSelection(p, pending.Action);
+        }, requiresAdmin: true));
+
+        _rankMenus[admin.Slot] = state;
+        RenderRankMenu(admin, state);
+    }
+
+    private void OpenAdminRankSelection(
+        CCSPlayerController admin,
+        string targetSteamId,
+        string targetName)
+    {
+        if (!IsRankAdmin(admin) || _config == null)
+        {
+            CloseRankMenu(admin);
+            return;
+        }
+
+        var state = new RezRankMenuState
+        {
+            Title = $"RezRank — звание для {targetName}",
+            SelectedIndex = 0,
+            OpenedAtUtc = DateTime.UtcNow,
+            LastInputUtc = DateTime.UtcNow,
+            PreviousButtons = admin.Buttons.ToString()
+        };
+
+        foreach (var rank in _config.RankProgression.Ranks
+                     .Where(rank => rank != null)
+                     .OrderBy(rank => rank.MinXp))
+        {
+            var selectedRank = rank;
+            state.Options.Add(new RezRankMenuOption(selectedRank.Name, p =>
+            {
+                if (!IsRankAdmin(p))
+                {
+                    CloseRankMenu(p);
+                    return;
+                }
+
+                _ = ApplyAdminRankAsync(
+                    p,
+                    targetSteamId,
+                    targetName,
+                    selectedRank,
+                    _shutdown?.Token ?? CancellationToken.None);
+                OpenAdminMenu(p);
+            }, requiresAdmin: true));
+        }
+
+        state.Options.Add(new RezRankMenuOption("Назад", p =>
+        {
+            OpenAdminPlayerSelection(p, AdminAction.SetRank);
+        }, requiresAdmin: true));
+
+        _rankMenus[admin.Slot] = state;
+        RenderRankMenu(admin, state);
+    }
+
+    private async Task ApplyAdminRankAsync(
+        CCSPlayerController admin,
+        string targetSteamId,
+        string targetName,
+        RankDefinition rank,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (_database == null)
+                return;
+
+            await _databaseReadyTask;
+            var result = await _database.SetPlayerXpAsync(
+                targetSteamId,
+                targetName,
+                rank.MinXp,
+                cancellationToken);
+
+            UpdateOnlineTabRank(targetSteamId, result.CurrentXp);
+
+            Server.NextFrame(() =>
+            {
+                if (!admin.IsValid || !IsRankAdmin(admin))
+                    return;
+
+                admin.PrintToChat(FormatChat(
+                    "{SILVER}[{ORANGE}RezRank{SILVER}] {GREEN}Готово! {YELLOW}Игроку %PLAYER% выдано звание {BLUE}%RANK%{YELLOW}. XP: %OLD% → %NEW%.",
+                    ("%PLAYER%", targetName),
+                    ("%RANK%", rank.Name),
+                    ("%OLD%", result.PreviousXp.ToString(CultureInfo.InvariantCulture)),
+                    ("%NEW%", result.CurrentXp.ToString(CultureInfo.InvariantCulture))));
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            // Plugin is unloading.
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "RezRank: admin rank assignment failed for {SteamId}.", targetSteamId);
+            Server.NextFrame(() =>
+            {
+                if (admin.IsValid && IsRankAdmin(admin))
+                    admin.PrintToChat(FormatChat("{SILVER}[{ORANGE}RezRank{SILVER}] {RED}Не удалось выдать звание игроку."));
+            });
+        }
     }
 
     private async Task ApplyAdminXpAmountAsync(
