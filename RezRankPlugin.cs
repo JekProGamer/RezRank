@@ -799,9 +799,9 @@ public sealed class RezRankPlugin : BasePlugin
                 .TakeWhile(rank => rank.MinXp <= xp)
                 .Count() - 1;
 
-        var competitiveRanking = 1 + Math.Clamp(rankIndex, 0, 17);
+        var competitiveRanking = Math.Clamp(rankIndex, 0, 17);
 
-        // Cache the desired standard CS2 competitive rank (Silver I = 1, Global Elite = 18).
+        // Cache the desired standard CS2 competitive rank (Silver I = 0, Global Elite = 17).
         // Apply it to the live controller immediately on the next game frame instead of
         // waiting for the periodic tick listener. The tick listener remains as a safety net.
         Server.NextFrame(() =>
