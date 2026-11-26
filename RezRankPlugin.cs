@@ -802,10 +802,39 @@ public sealed class RezRankPlugin : BasePlugin
         var competitiveRanking = 1 + Math.Clamp(rankIndex, 0, 17);
 
         // Cache the desired standard CS2 competitive rank (Silver I = 1, Global Elite = 18).
-        // The tick listener reapplies it if the game overwrites the player's rank fields.
-        Server.NextFrame(() => _onlineTabRanks[steamId] = competitiveRanking);
+        // Apply it to the live controller immediately on the next game frame instead of
+        // waiting for the periodic tick listener. The tick listener remains as a safety net.
+        Server.NextFrame(() =>
+        {
+            _onlineTabRanks[steamId] = competitiveRanking;
+
+            var player = Utilities.GetPlayers().FirstOrDefault(candidate =>
+                candidate.IsValid &&
+                !candidate.IsBot &&
+                !candidate.IsHLTV &&
+                candidate.SteamID.ToString() == steamId);
+
+            if (player == null)
+                return;
+
+            const sbyte competitiveRankType = 12;
+            player.CompetitiveWins = 777;
+            player.CompetitiveRankType = competitiveRankType;
+            player.CompetitiveRanking = competitiveRanking;
+
+            var recipients = new RecipientFilter();
+            recipients.Add(player);
+            UserMessage.FromId(350).Send(recipients);
+
+            Logger.LogInformation(
+                "RezRank: immediately applied TAB rank {CompetitiveRanking} to {SteamId} (XP: {Xp}).",
+                competitiveRanking,
+                steamId,
+                xp);
+        });
+
         Logger.LogDebug(
-            "RezRank: queued TAB rank {CompetitiveRanking} for {SteamId} (XP: {Xp}).",
+            "RezRank: queued immediate TAB rank {CompetitiveRanking} for {SteamId} (XP: {Xp}).",
             competitiveRanking,
             steamId,
             xp);
