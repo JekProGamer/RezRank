@@ -864,6 +864,22 @@ public sealed class RezRankPlugin : BasePlugin
 
             UpdateOnlineTabRank(attackerSteamId, result.CurrentXp);
 
+            var killXpAwarded = attackerIsBypass ? 0 : xpReward;
+            if (killXpAwarded > 0)
+            {
+                Server.NextFrame(() =>
+                {
+                    var player = Utilities.GetPlayers().FirstOrDefault(candidate =>
+                        candidate.IsValid &&
+                        !candidate.IsBot &&
+                        !candidate.IsHLTV &&
+                        candidate.SteamID.ToString() == attackerSteamId);
+                    player?.PrintToChat(FormatChat(
+                        _config!.ChatMessages.KillReward,
+                        ("%XP%", killXpAwarded.ToString())));
+                });
+            }
+
             if (victimXpPenalty > 0)
             {
                 var victimResult = await _database.AdjustPlayerXpAsync(
