@@ -132,6 +132,7 @@ public sealed class ChatMessagesConfig
     public string PlayerStats { get; set; } = "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}Убийства: {GREEN}%KILLS% {SILVER}| {WHITE}Смерти: {RED}%DEATHS% {SILVER}| {WHITE}K/D: {YELLOW}%KD%";
     public string NextRank { get; set; } = "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}До {BLUE}%NEXT_RANK%: {GREEN}%XP_LEFT% XP";
     public string MaxRank { get; set; } = "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {GREEN}У вас максимальный ранг!";
+    public string KillReward { get; set; } = "{SILVER}[{ORANGE}RezRank{SILVER}] {WHITE}За убийство игрока начислено {GREEN}+%XP% XP";
     public string RankUp { get; set; } = "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}%PLAYER% получил звание {BLUE}%RANK%{WHITE}!";
     public string NoData { get; set; } = "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}Статистика пока не найдена. Сыграйте немного, чтобы создать запись.";
     public string Error { get; set; } = "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {RED}Не удалось получить статус. Попробуйте позже.";
