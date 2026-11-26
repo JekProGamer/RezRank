@@ -48,6 +48,35 @@ public sealed class RezRankPlugin : BasePlugin
             var configPath = Path.Combine(ModuleDirectory, "config.json");
             _config = RezRankConfig.Load(configPath);
 
+            _config.Bypass.SteamIds ??= new List<string>();
+            _config.Bypass.SteamIds = _config.Bypass.SteamIds
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(id => id.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
+            Logger.LogInformation(
+                "RezRank: loaded config from {ConfigPath}. XP per kill: {XpPerKill}; XP loss per death: {XpLossPerDeath}; Bypass enabled: {BypassEnabled}; Bypass SteamIDs: {BypassSteamIds}.",
+                Path.GetFullPath(configPath),
+                _config.RankProgression.XpPerKill,
+                _config.RankProgression.XpLossPerDeath,
+                _config.Bypass.Enabled,
+                string.Join(", ", _config.Bypass.SteamIds));
+
+            var configuredRanks = _config.RankProgression.Ranks
+                .Where(rank => rank != null)
+                .OrderBy(rank => rank.MinXp)
+                .ToList();
+            for (var index = 0; index < configuredRanks.Count; index++)
+            {
+                var rank = configuredRanks[index];
+                Logger.LogInformation(
+                    "RezRank: config rank index {RankIndex}: {RankName}, MinXp={MinXp}.",
+                    index,
+                    rank.Name,
+                    rank.MinXp);
+            }
+
             // The public !rank menu must work even when MySQL is disabled.
             // Register its tick handler before any database-related early return
             // so the menu remains visible and its navigation keys are processed.
@@ -58,13 +87,6 @@ public sealed class RezRankPlugin : BasePlugin
                 Logger.LogInformation("RezRank: MySQL is disabled in config.");
                 return;
             }
-
-            _config.Bypass.SteamIds ??= new List<string>();
-            _config.Bypass.SteamIds = _config.Bypass.SteamIds
-                .Where(id => !string.IsNullOrWhiteSpace(id))
-                .Select(id => id.Trim())
-                .Distinct(StringComparer.Ordinal)
-                .ToList();
 
             if (_config.RankProgression.XpPerKill < 0)
                 throw new InvalidOperationException("RankProgression.XpPerKill cannot be negative.");
@@ -791,15 +813,26 @@ public sealed class RezRankPlugin : BasePlugin
         if (_config == null)
             return;
 
-        var rankIndex = IsBypass(steamId)
+        var isBypass = IsBypass(steamId);
+        var orderedRanks = _config.RankProgression.Ranks
+            .Where(rank => rank != null)
+            .OrderBy(rank => rank.MinXp)
+            .ToList();
+        var rankIndex = isBypass
             ? 17
-            : _config.RankProgression.Ranks
-                .Where(rank => rank != null)
-                .OrderBy(rank => rank.MinXp)
-                .TakeWhile(rank => rank.MinXp <= xp)
-                .Count() - 1;
-
+            : orderedRanks.TakeWhile(rank => rank.MinXp <= xp).Count() - 1;
+        var configuredRank = orderedRanks.LastOrDefault(rank => rank.MinXp <= xp);
         var competitiveRanking = Math.Clamp(rankIndex, 0, 17);
+
+        Logger.LogInformation(
+            "RezRank: TAB rank calculation for {SteamId}: XP={Xp}; Bypass={IsBypass}; configured rank={ConfiguredRank} (MinXp={MinXp}); rankIndex={RankIndex}; CompetitiveRanking={CompetitiveRanking}.",
+            steamId,
+            xp,
+            isBypass,
+            isBypass ? _config.Bypass.RankName : configuredRank?.Name ?? "Unranked",
+            configuredRank?.MinXp ?? 0,
+            rankIndex,
+            competitiveRanking);
 
         // Cache the desired standard CS2 competitive rank (Silver I = 0, Global Elite = 17).
         // Apply it to the live controller immediately on the next game frame instead of
@@ -827,8 +860,10 @@ public sealed class RezRankPlugin : BasePlugin
             UserMessage.FromId(350).Send(recipients);
 
             Logger.LogInformation(
-                "RezRank: immediately applied TAB rank {CompetitiveRanking} to {SteamId} (XP: {Xp}).",
+                "RezRank: immediately applied TAB rank {CompetitiveRanking} (rankIndex={RankIndex}, Bypass={IsBypass}) to {SteamId} (XP: {Xp}).",
                 competitiveRanking,
+                rankIndex,
+                isBypass,
                 steamId,
                 xp);
         });
