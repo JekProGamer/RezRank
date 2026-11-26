@@ -124,7 +124,10 @@ public sealed class RezRankPlugin : BasePlugin
                     _disconnectingPlayers.Add(@event.Xuid.ToString());
                     var player = @event.Userid;
                     if (player != null)
+                    {
                         _rankMenus.Remove(player.Slot);
+                        _pendingAdminXp.Remove(@event.Xuid.ToString());
+                    }
 
                     _killStreaks.Remove(@event.Xuid.ToString());
                     _streakVictims.Remove(@event.Xuid.ToString());
@@ -271,12 +274,13 @@ public sealed class RezRankPlugin : BasePlugin
             !long.TryParse(info.GetArg(1), NumberStyles.None, CultureInfo.InvariantCulture, out var amount) ||
             amount < 0)
         {
-            player.PrintToChat(FormatChat("{SILVER}[{ORANGE}RezRank{SILVER}] {YELLOW}Укажи целое неотрицательное число: !rankamount 250"));
+            player.PrintToChat(FormatChat("{SILVER}[{ORANGE}RezRank{SILVER}] {YELLOW}Введи целое неотрицательное число в консоли сервера."));
             return;
         }
 
         _pendingAdminXp.Remove(adminSteamId);
         _ = ApplyAdminXpAmountAsync(player, pending, amount, _shutdown?.Token ?? CancellationToken.None);
+        OpenAdminMenu(player);
     }
 
     [ConsoleCommand("css_rank")]
@@ -1158,6 +1162,8 @@ public sealed class RezRankPlugin : BasePlugin
             return;
         }
 
+        _pendingAdminXp.Remove(admin.SteamID.ToString());
+
         var state = new RezRankMenuState
         {
             Title = $"RezRank — XP для {pending.TargetName}",
@@ -1187,9 +1193,50 @@ public sealed class RezRankPlugin : BasePlugin
             }, requiresAdmin: true));
         }
 
+        state.Options.Add(new RezRankMenuOption("Ввести своё количество", p =>
+        {
+            OpenAdminXpCustomInputPrompt(p, pending);
+        }, requiresAdmin: true));
+
         state.Options.Add(new RezRankMenuOption("Назад", p =>
         {
+            _pendingAdminXp.Remove(p.SteamID.ToString());
             OpenAdminPlayerSelection(p, pending.Action);
+        }, requiresAdmin: true));
+
+        _rankMenus[admin.Slot] = state;
+        RenderRankMenu(admin, state);
+    }
+
+    private void OpenAdminXpCustomInputPrompt(
+        CCSPlayerController admin,
+        PendingAdminXpChange pending)
+    {
+        if (!IsRankAdmin(admin))
+        {
+            CloseRankMenu(admin);
+            return;
+        }
+
+        _pendingAdminXp[admin.SteamID.ToString()] = pending;
+
+        var state = new RezRankMenuState
+        {
+            Title = "RezRank — своё количество XP",
+            SelectedIndex = 0,
+            OpenedAtUtc = DateTime.UtcNow,
+            LastInputUtc = DateTime.UtcNow,
+            PreviousButtons = admin.Buttons.ToString()
+        };
+
+        state.Options.Add(new RezRankMenuOption("Открой консоль и введи css_rankamount 250", _ =>
+        {
+            // The input is entered in the developer console, not in chat.
+        }, requiresAdmin: true));
+        state.Options.Add(new RezRankMenuOption("Назад", p =>
+        {
+            _pendingAdminXp.Remove(p.SteamID.ToString());
+            OpenAdminXpAmountSelection(p, pending);
         }, requiresAdmin: true));
 
         _rankMenus[admin.Slot] = state;
@@ -1271,15 +1318,25 @@ public sealed class RezRankPlugin : BasePlugin
 
             Server.NextFrame(() =>
             {
-                if (!admin.IsValid || !IsRankAdmin(admin))
-                    return;
+                if (admin.IsValid && IsRankAdmin(admin))
+                {
+                    admin.PrintToChat(FormatChat(
+                        "{SILVER}[{ORANGE}RezRank{SILVER}] {YELLOW}Вы установили игроку {SILVER}%PLAYER% {YELLOW}звание {BLUE}%RANK%{GREEN}! {YELLOW}XP: %NEW%.",
+                        ("%PLAYER%", targetName),
+                        ("%RANK%", rank.Name),
+                        ("%NEW%", result.CurrentXp.ToString(CultureInfo.InvariantCulture))));
+                }
 
-                admin.PrintToChat(FormatChat(
-                    "{SILVER}[{ORANGE}RezRank{SILVER}] {GREEN}Готово! {YELLOW}Игроку %PLAYER% выдано звание {BLUE}%RANK%{YELLOW}. XP: %OLD% → %NEW%.",
-                    ("%PLAYER%", targetName),
+                var target = Utilities.GetPlayers().FirstOrDefault(candidate =>
+                    candidate.IsValid &&
+                    !candidate.IsBot &&
+                    !candidate.IsHLTV &&
+                    candidate.SteamID.ToString() == targetSteamId);
+
+                target?.PrintToChat(FormatChat(
+                    "{SILVER}[{ORANGE}RezRank{SILVER}] {WHITE}Администратор установил вам звание {BLUE}%RANK%{WHITE}. Ваш опыт: {YELLOW}%XP% XP.",
                     ("%RANK%", rank.Name),
-                    ("%OLD%", result.PreviousXp.ToString(CultureInfo.InvariantCulture)),
-                    ("%NEW%", result.CurrentXp.ToString(CultureInfo.InvariantCulture))));
+                    ("%XP%", result.CurrentXp.ToString(CultureInfo.InvariantCulture))));
             });
         }
         catch (OperationCanceledException)
@@ -1324,22 +1381,54 @@ public sealed class RezRankPlugin : BasePlugin
 
             Server.NextFrame(() =>
             {
-                if (!admin.IsValid || !IsRankAdmin(admin))
+                var isAdd = pending.Action == AdminAction.AddXp;
+                var isRemove = pending.Action == AdminAction.RemoveXp;
+                var displayedAmount = isAdd || isRemove
+                    ? Math.Abs(result.CurrentXp - result.PreviousXp)
+                    : result.CurrentXp;
+
+                if (admin.IsValid && IsRankAdmin(admin))
+                {
+                    var adminMessage = pending.Action switch
+                    {
+                        AdminAction.AddXp =>
+                            "{SILVER}[{ORANGE}RezRank{SILVER}] {YELLOW}Вы выдали игроку {SILVER}%PLAYER% {YELLOW}%AMOUNT% XP{GREEN}!",
+                        AdminAction.RemoveXp =>
+                            "{SILVER}[{ORANGE}RezRank{SILVER}] {YELLOW}Вы сняли у игрока {SILVER}%PLAYER% {YELLOW}%AMOUNT% XP{GREEN}!",
+                        _ =>
+                            "{SILVER}[{ORANGE}RezRank{SILVER}] {YELLOW}Вы установили игроку {SILVER}%PLAYER% {YELLOW}%AMOUNT% XP{GREEN}!"
+                    };
+
+                    admin.PrintToChat(FormatChat(
+                        adminMessage + " {GREY}Было: %OLD%, стало: %NEW%.",
+                        ("%PLAYER%", pending.TargetName),
+                        ("%AMOUNT%", displayedAmount.ToString(CultureInfo.InvariantCulture)),
+                        ("%OLD%", result.PreviousXp.ToString(CultureInfo.InvariantCulture)),
+                        ("%NEW%", result.CurrentXp.ToString(CultureInfo.InvariantCulture))));
+                }
+
+                var target = Utilities.GetPlayers().FirstOrDefault(candidate =>
+                    candidate.IsValid &&
+                    !candidate.IsBot &&
+                    !candidate.IsHLTV &&
+                    candidate.SteamID.ToString() == pending.TargetSteamId);
+
+                if (target == null)
                     return;
 
-                var actionText = pending.Action switch
+                var targetMessage = pending.Action switch
                 {
-                    AdminAction.AddXp => "выдано",
-                    AdminAction.RemoveXp => "снято",
-                    _ => "установлено"
+                    AdminAction.AddXp =>
+                        "{SILVER}[{ORANGE}RezRank{SILVER}] {WHITE}Администратор выдал вам {YELLOW}%AMOUNT% XP{GREEN}!",
+                    AdminAction.RemoveXp =>
+                        "{SILVER}[{ORANGE}RezRank{SILVER}] {WHITE}Администратор снял у вас {YELLOW}%AMOUNT% XP{GREEN}!",
+                    _ =>
+                        "{SILVER}[{ORANGE}RezRank{SILVER}] {WHITE}Администратор установил вам {YELLOW}%AMOUNT% XP{GREEN}!"
                 };
-                admin.PrintToChat(FormatChat(
-                    "{SILVER}[{ORANGE}RezRank{SILVER}] {GREEN}Готово! {YELLOW}Игрок: %PLAYER%. %ACTION% XP: %AMOUNT%. Было: %OLD%, стало: %NEW%.",
-                    ("%PLAYER%", pending.TargetName),
-                    ("%ACTION%", actionText),
-                    ("%AMOUNT%", amount.ToString(CultureInfo.InvariantCulture)),
-                    ("%OLD%", result.PreviousXp.ToString(CultureInfo.InvariantCulture)),
-                    ("%NEW%", result.CurrentXp.ToString(CultureInfo.InvariantCulture))));
+
+                target.PrintToChat(FormatChat(
+                    targetMessage,
+                    ("%AMOUNT%", displayedAmount.ToString(CultureInfo.InvariantCulture))));
             });
         }
         catch (OperationCanceledException)
