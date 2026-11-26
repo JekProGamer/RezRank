@@ -958,7 +958,7 @@ public sealed class RezRankPlugin : BasePlugin
     }
 
 
-    private static void PlayRankUpSound(CCSPlayerController player)
+    private void PlayRankUpSound(CCSPlayerController player)
     {
         if (!player.IsValid || player.IsBot || player.IsHLTV)
             return;
@@ -971,9 +971,7 @@ public sealed class RezRankPlugin : BasePlugin
         catch (Exception exception)
         {
             // A sound playback failure must never interrupt rank progression.
-            // Keep this at debug level because the player's rank was still updated.
-            // The caller already runs on the game thread.
-            // Logger is not static, so report through the plugin instance at call sites if needed.
+            Logger.LogDebug(exception, "RezRank: failed to play rank-up sound for player {SteamId}.", player.SteamID);
         }
     }
 
