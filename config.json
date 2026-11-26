@@ -110,6 +110,7 @@
     "PlayerStats": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}Убийства: {GREEN}%KILLS% {SILVER}| {WHITE}Смерти: {RED}%DEATHS% {SILVER}| {WHITE}K/D: {YELLOW}%KD%",
     "NextRank": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}До {BLUE}%NEXT_RANK%: {GREEN}%XP_LEFT% XP",
     "MaxRank": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {GREEN}У вас максимальный ранг!",
+    "KillReward": "{SILVER}[{ORANGE}RezRank{SILVER}] {WHITE}За убийство игрока начислено {GREEN}+%XP% XP",
     "RankUp": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {GREEN}Поздравляем! Вы получили новый ранг: {BLUE}%RANK%{GREEN}!",
     "NoData": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}Статистика пока не найдена. Сыграйте немного, чтобы создать запись.",
     "Error": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {RED}Не удалось получить статус. Попробуйте позже."
