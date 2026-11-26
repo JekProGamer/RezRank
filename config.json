@@ -24,7 +24,7 @@
   },
   "RankProgression": {
     "XpPerKill": 5,
-    "XpLossPerDeath": 7,
+    "XpLossPerDeath": 6,
     "Ranks": [
       {
         "Name": "Silver I",
@@ -116,10 +116,10 @@
   },
   "Achievements": {
     "Enabled": true,
-    "DoubleKillXp": 2,
-    "TripleKillXp": 4,
-    "QuadKillXp": 6,
-    "AceXp": 10,
+    "DoubleKillXp": 10,
+    "TripleKillXp": 20,
+    "QuadKillXp": 30,
+    "AceXp": 50,
     "Message": "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {GOLD}%ACHIEVEMENT%! {GREEN}+%XP% XP"
   }
 }
