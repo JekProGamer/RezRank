@@ -1330,7 +1330,9 @@ public sealed class RezRankPlugin : BasePlugin
         };
 
         foreach (var rank in _config.RankProgression.Ranks
-                     .Where(rank => rank != null)
+                     .Where(rank => rank != null && !string.IsNullOrWhiteSpace(rank.Name))
+                     .GroupBy(rank => rank.Name.Trim(), StringComparer.OrdinalIgnoreCase)
+                     .Select(group => group.OrderBy(rank => rank.MinXp).First())
                      .OrderBy(rank => rank.MinXp))
         {
             var selectedRank = rank;
