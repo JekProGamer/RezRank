@@ -84,6 +84,7 @@ public sealed class RankProgressionConfig
     public int XpPerKill { get; set; } = 5;
     public int XpLossPerDeath { get; set; } = 6;
 
+    [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
     public List<RankDefinition> Ranks { get; set; } = new()
     {
         new() { Name = "Silver I", MinXp = 0 },
