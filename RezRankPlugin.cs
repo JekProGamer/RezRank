@@ -874,6 +874,24 @@ public sealed class RezRankPlugin : BasePlugin
                 var actualXpLost = victimResult.PreviousXp - victimResult.CurrentXp;
                 UpdateOnlineTabRank(victimSteamId, victimResult.CurrentXp);
 
+                var victimOldRank = GetRank(victimResult.PreviousXp);
+                var victimNewRank = GetRank(victimResult.CurrentXp);
+                var victimRankedDown = victimNewRank.MinXp < victimOldRank.MinXp;
+
+                if (victimRankedDown)
+                {
+                    Server.NextFrame(() =>
+                    {
+                        var victim = Utilities.GetPlayers().FirstOrDefault(candidate =>
+                            candidate.IsValid &&
+                            !candidate.IsBot &&
+                            !candidate.IsHLTV &&
+                            candidate.SteamID.ToString() == victimSteamId);
+                        if (victim != null)
+                            PlayRankDownSound(victim);
+                    });
+                }
+
                 if (actualXpLost > 0)
                 {
                     Server.NextFrame(() =>
@@ -936,7 +954,12 @@ public sealed class RezRankPlugin : BasePlugin
                         candidate.SteamID.ToString() == attackerSteamId);
 
                     if (player != null)
-                        PlayRankUpSound(player);
+                    {
+                        if (newRank.MinXp > oldRank.MinXp)
+                            PlayRankUpSound(player);
+                        else if (newRank.MinXp < oldRank.MinXp)
+                            PlayRankDownSound(player);
+                    }
 
                     if (reachedMaximumRank && _config.Announcements.BroadcastMaxRank)
                     {
@@ -1013,6 +1036,22 @@ public sealed class RezRankPlugin : BasePlugin
         {
             // A sound playback failure must never interrupt rank progression.
             Logger.LogDebug(exception, "RezRank: failed to play rank-up sound for player {SteamId}.", player.SteamID);
+        }
+    }
+
+    private void PlayRankDownSound(CCSPlayerController player)
+    {
+        if (!player.IsValid || player.IsBot || player.IsHLTV)
+            return;
+
+        try
+        {
+            // Built-in CS2 negative feedback sound for rank demotion.
+            player.ExecuteClientCommand("play sounds/ui/weapon_cant_buy.vsnd_c");
+        }
+        catch (Exception exception)
+        {
+            Logger.LogDebug(exception, "RezRank: failed to play rank-down sound for player {SteamId}.", player.SteamID);
         }
     }
 
@@ -1401,8 +1440,15 @@ public sealed class RezRankPlugin : BasePlugin
                     !candidate.IsHLTV &&
                     candidate.SteamID.ToString() == targetSteamId);
 
-                if (target != null && result.CurrentXp > result.PreviousXp)
-                    PlayRankUpSound(target);
+                if (target != null)
+                {
+                    var previousRank = GetRank(result.PreviousXp);
+                    var currentRank = GetRank(result.CurrentXp);
+                    if (currentRank.MinXp > previousRank.MinXp)
+                        PlayRankUpSound(target);
+                    else if (currentRank.MinXp < previousRank.MinXp)
+                        PlayRankDownSound(target);
+                }
 
                 target?.PrintToChat(FormatChat(
                     "{SILVER}[{ORANGE}RezRank{SILVER}] {WHITE}Администратор установил вам звание {BLUE}%RANK%{WHITE}. Ваш опыт: {YELLOW}%XP% XP.",
@@ -1453,6 +1499,7 @@ public sealed class RezRankPlugin : BasePlugin
             var previousRank = GetRank(result.PreviousXp);
             var currentRank = GetRank(result.CurrentXp);
             var rankedUp = currentRank.MinXp > previousRank.MinXp;
+            var rankedDown = currentRank.MinXp < previousRank.MinXp;
 
             Server.NextFrame(() =>
             {
@@ -1493,6 +1540,8 @@ public sealed class RezRankPlugin : BasePlugin
 
                 if (rankedUp)
                     PlayRankUpSound(target);
+                else if (rankedDown)
+                    PlayRankDownSound(target);
 
                 var targetMessage = pending.Action switch
                 {
