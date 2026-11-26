@@ -24,6 +24,7 @@
   },
   "RankProgression": {
     "XpPerKill": 5,
+    "XpLossPerDeath": 7,
     "Ranks": [
       {
         "Name": "Silver I",
