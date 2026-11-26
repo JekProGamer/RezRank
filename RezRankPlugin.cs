@@ -1222,17 +1222,13 @@ public sealed class RezRankPlugin : BasePlugin
 
         var state = new RezRankMenuState
         {
-            Title = "RezRank — своё количество XP",
+            Title = "Консоль: css_rankamount 250",
             SelectedIndex = 0,
             OpenedAtUtc = DateTime.UtcNow,
             LastInputUtc = DateTime.UtcNow,
             PreviousButtons = admin.Buttons.ToString()
         };
 
-        state.Options.Add(new RezRankMenuOption("Открой консоль и введи css_rankamount 250", _ =>
-        {
-            // The input is entered in the developer console, not in chat.
-        }, requiresAdmin: true));
         state.Options.Add(new RezRankMenuOption("Назад", p =>
         {
             _pendingAdminXp.Remove(p.SteamID.ToString());
