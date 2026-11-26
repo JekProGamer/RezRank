@@ -888,6 +888,15 @@ public sealed class RezRankPlugin : BasePlugin
 
                 Server.NextFrame(() =>
                 {
+                    var player = Utilities.GetPlayers().FirstOrDefault(candidate =>
+                        candidate.IsValid &&
+                        !candidate.IsBot &&
+                        !candidate.IsHLTV &&
+                        candidate.SteamID.ToString() == attackerSteamId);
+
+                    if (player != null)
+                        PlayRankUpSound(player);
+
                     if (reachedMaximumRank && _config.Announcements.BroadcastMaxRank)
                     {
                         Server.PrintToChatAll(FormatChat(
@@ -897,10 +906,6 @@ public sealed class RezRankPlugin : BasePlugin
                         return;
                     }
 
-                    var player = Utilities.GetPlayers().FirstOrDefault(candidate =>
-                        candidate.IsValid &&
-                        !candidate.IsBot &&
-                        candidate.SteamID.ToString() == attackerSteamId);
                     player?.PrintToChat(FormatChat(
                         _config.ChatMessages.RankUp,
                         ("%PLAYER%", attackerName),
@@ -952,6 +957,25 @@ public sealed class RezRankPlugin : BasePlugin
         }
     }
 
+
+    private static void PlayRankUpSound(CCSPlayerController player)
+    {
+        if (!player.IsValid || player.IsBot || player.IsHLTV)
+            return;
+
+        try
+        {
+            // Built-in CS2 rank-promotion sound; no custom Workshop addon is required.
+            player.ExecuteClientCommand("play sounds/ui/premier_eom_rankup");
+        }
+        catch (Exception exception)
+        {
+            // A sound playback failure must never interrupt rank progression.
+            // Keep this at debug level because the player's rank was still updated.
+            // The caller already runs on the game thread.
+            // Logger is not static, so report through the plugin instance at call sites if needed.
+        }
+    }
 
     private static string FormatChat(string template, params (string Token, string Value)[] replacements)
     {
@@ -1382,6 +1406,10 @@ public sealed class RezRankPlugin : BasePlugin
 
             UpdateOnlineTabRank(pending.TargetSteamId, result.CurrentXp);
 
+            var previousRank = GetRank(result.PreviousXp);
+            var currentRank = GetRank(result.CurrentXp);
+            var rankedUp = currentRank.MinXp > previousRank.MinXp;
+
             Server.NextFrame(() =>
             {
                 var isAdd = pending.Action == AdminAction.AddXp;
@@ -1418,6 +1446,9 @@ public sealed class RezRankPlugin : BasePlugin
 
                 if (target == null)
                     return;
+
+                if (rankedUp)
+                    PlayRankUpSound(target);
 
                 var targetMessage = pending.Action switch
                 {
