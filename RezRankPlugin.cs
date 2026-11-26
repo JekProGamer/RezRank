@@ -1115,6 +1115,7 @@ public sealed class RezRankPlugin : BasePlugin
         RemoveXp,
         SetXp,
         SetRank,
+        RemoveRank,
         ResetProgress,
         PlayerInfo
     }
@@ -1165,6 +1166,11 @@ public sealed class RezRankPlugin : BasePlugin
         {
             CloseRankMenu(p);
             OpenAdminPlayerSelection(p, AdminAction.SetRank);
+        }, requiresAdmin: true));
+        state.Options.Add(new RezRankMenuOption("Забрать звание", p =>
+        {
+            CloseRankMenu(p);
+            OpenAdminPlayerSelection(p, AdminAction.RemoveRank);
         }, requiresAdmin: true));
         state.Options.Add(new RezRankMenuOption("Информация об игроке", p =>
         {
@@ -1223,6 +1229,17 @@ public sealed class RezRankPlugin : BasePlugin
                 if (action == AdminAction.SetRank)
                 {
                     OpenAdminRankSelection(p, targetSteamId, targetName);
+                    return;
+                }
+
+                if (action == AdminAction.RemoveRank)
+                {
+                    CloseRankMenu(p);
+                    _ = ApplyAdminRemoveRankAsync(
+                        p,
+                        targetSteamId,
+                        targetName,
+                        _shutdown?.Token ?? CancellationToken.None);
                     return;
                 }
 
@@ -1487,6 +1504,85 @@ public sealed class RezRankPlugin : BasePlugin
             {
                 if (admin.IsValid && IsRankAdmin(admin))
                     admin.PrintToChat(FormatChat("{SILVER}[{ORANGE}RezRank{SILVER}] {RED}Не удалось выдать звание игроку."));
+            });
+        }
+    }
+
+    private async Task ApplyAdminRemoveRankAsync(
+        CCSPlayerController admin,
+        string targetSteamId,
+        string targetName,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (_database == null || _config == null)
+                return;
+
+            await _databaseReadyTask;
+
+            // Removing a rank resets XP to the Silver I threshold only.
+            // SetPlayerXpAsync updates XP and player activity, preserving kills,
+            // deaths, and all achievement records.
+            var silverRank = _config.RankProgression.Ranks
+                .Where(rank => rank != null && !string.IsNullOrWhiteSpace(rank.Name))
+                .OrderBy(rank => rank.MinXp)
+                .FirstOrDefault();
+
+            if (silverRank == null)
+                throw new InvalidOperationException("No ranks are configured.");
+
+            var result = await _database.SetPlayerXpAsync(
+                targetSteamId,
+                targetName,
+                0,
+                cancellationToken);
+
+            UpdateOnlineTabRank(targetSteamId, result.CurrentXp);
+
+            var previousRank = GetRank(result.PreviousXp);
+            var currentRank = GetRank(result.CurrentXp);
+            var rankedDown = currentRank.MinXp < previousRank.MinXp;
+
+            Server.NextFrame(() =>
+            {
+                if (admin.IsValid && IsRankAdmin(admin))
+                {
+                    admin.PrintToChat(FormatChat(
+                        "{SILVER}[{ORANGE}RezRank{SILVER}] {GREEN}Вы забрали звание у игрока {SILVER}%PLAYER%{GREEN}. Ему установлен ранг {BLUE}%RANK%{GREEN}, XP: {YELLOW}0.",
+                        ("%PLAYER%", targetName),
+                        ("%RANK%", silverRank.Name)));
+                }
+
+                var target = Utilities.GetPlayers().FirstOrDefault(candidate =>
+                    candidate.IsValid &&
+                    !candidate.IsBot &&
+                    !candidate.IsHLTV &&
+                    candidate.SteamID.ToString() == targetSteamId);
+
+                if (target == null)
+                    return;
+
+                if (rankedDown)
+                    PlayRankDownSound(target);
+
+                target.PrintToChat(FormatChat(
+                    "{SILVER}[{ORANGE}RezRank{SILVER}] {WHITE}Администратор забрал у вас звание. Вам установлен ранг {BLUE}%RANK%{WHITE}, ваш опыт: {YELLOW}0 XP.",
+                    ("%RANK%", silverRank.Name)));
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            // Plugin is unloading.
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "RezRank: failed to remove rank from {SteamId}.", targetSteamId);
+            Server.NextFrame(() =>
+            {
+                if (admin.IsValid && IsRankAdmin(admin))
+                    admin.PrintToChat(FormatChat(
+                        "{SILVER}[{ORANGE}RezRank{SILVER}] {RED}Не удалось забрать звание у игрока."));
             });
         }
     }
