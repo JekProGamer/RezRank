@@ -82,6 +82,7 @@ public sealed class BypassConfig
 public sealed class RankProgressionConfig
 {
     public int XpPerKill { get; set; } = 5;
+    public int XpLossPerDeath { get; set; } = 7;
 
     public List<RankDefinition> Ranks { get; set; } = new()
     {
