@@ -29,7 +29,6 @@ public sealed class RezRankPlugin : BasePlugin
     private readonly Dictionary<string, int> _killStreaks = new(StringComparer.Ordinal);
     private readonly Dictionary<string, HashSet<string>> _streakVictims = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, int> _onlineTabRanks = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, PendingAdminXpChange> _pendingAdminXp = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, PlayerButtons> RankMenuButtons = new(StringComparer.OrdinalIgnoreCase)
     {
         ["W"] = PlayerButtons.Forward,
@@ -124,10 +123,7 @@ public sealed class RezRankPlugin : BasePlugin
                     _disconnectingPlayers.Add(@event.Xuid.ToString());
                     var player = @event.Userid;
                     if (player != null)
-                    {
                         _rankMenus.Remove(player.Slot);
-                        _pendingAdminXp.Remove(@event.Xuid.ToString());
-                    }
 
                     _killStreaks.Remove(@event.Xuid.ToString());
                     _streakVictims.Remove(@event.Xuid.ToString());
@@ -255,32 +251,6 @@ public sealed class RezRankPlugin : BasePlugin
             return;
 
         _ = SendAchievementLeaderboardAsync(player, _shutdown?.Token ?? CancellationToken.None);
-    }
-
-    [ConsoleCommand("css_rankamount")]
-    public void SetAdminXpAmount(CCSPlayerController? player, CommandInfo info)
-    {
-        if (player == null || !IsRankAdmin(player))
-            return;
-
-        var adminSteamId = player.SteamID.ToString();
-        if (!_pendingAdminXp.TryGetValue(adminSteamId, out var pending))
-        {
-            player.PrintToChat(FormatChat("{SILVER}[{ORANGE}RezRank{SILVER}] {YELLOW}Сначала выбери действие и игрока в меню администрации."));
-            return;
-        }
-
-        if (info.ArgCount < 2 ||
-            !long.TryParse(info.GetArg(1), NumberStyles.None, CultureInfo.InvariantCulture, out var amount) ||
-            amount < 0)
-        {
-            player.PrintToChat(FormatChat("{SILVER}[{ORANGE}RezRank{SILVER}] {YELLOW}Введи целое неотрицательное число в консоли сервера."));
-            return;
-        }
-
-        _pendingAdminXp.Remove(adminSteamId);
-        _ = ApplyAdminXpAmountAsync(player, pending, amount, _shutdown?.Token ?? CancellationToken.None);
-        OpenAdminMenu(player);
     }
 
     [ConsoleCommand("css_rank")]
@@ -1162,8 +1132,6 @@ public sealed class RezRankPlugin : BasePlugin
             return;
         }
 
-        _pendingAdminXp.Remove(admin.SteamID.ToString());
-
         var state = new RezRankMenuState
         {
             Title = $"RezRank — XP для {pending.TargetName}",
@@ -1200,7 +1168,6 @@ public sealed class RezRankPlugin : BasePlugin
 
         state.Options.Add(new RezRankMenuOption("Назад", p =>
         {
-            _pendingAdminXp.Remove(p.SteamID.ToString());
             OpenAdminPlayerSelection(p, pending.Action);
         }, requiresAdmin: true));
 
@@ -1210,7 +1177,8 @@ public sealed class RezRankPlugin : BasePlugin
 
     private void OpenAdminXpCustomInputPrompt(
         CCSPlayerController admin,
-        PendingAdminXpChange pending)
+        PendingAdminXpChange pending,
+        long amount = 0)
     {
         if (!IsRankAdmin(admin))
         {
@@ -1218,20 +1186,59 @@ public sealed class RezRankPlugin : BasePlugin
             return;
         }
 
-        _pendingAdminXp[admin.SteamID.ToString()] = pending;
-
+        amount = Math.Max(0, amount);
         var state = new RezRankMenuState
         {
-            Title = "Консоль: css_rankamount 250",
+            Title = $"Своя сумма XP: {amount.ToString(CultureInfo.InvariantCulture)}",
             SelectedIndex = 0,
             OpenedAtUtc = DateTime.UtcNow,
             LastInputUtc = DateTime.UtcNow,
             PreviousButtons = admin.Buttons.ToString()
         };
 
+        foreach (var step in new long[] { 10000, 1000, 100, 10, 1 })
+        {
+            var selectedStep = step;
+            state.Options.Add(new RezRankMenuOption($"+{selectedStep} XP", p =>
+            {
+                var nextAmount = amount > long.MaxValue - selectedStep
+                    ? long.MaxValue
+                    : amount + selectedStep;
+                OpenAdminXpCustomInputPrompt(p, pending, nextAmount);
+            }, requiresAdmin: true));
+        }
+
+        foreach (var step in new long[] { 10000, 1000, 100, 10, 1 })
+        {
+            var selectedStep = step;
+            state.Options.Add(new RezRankMenuOption($"−{selectedStep} XP", p =>
+            {
+                var nextAmount = Math.Max(0, amount - selectedStep);
+                OpenAdminXpCustomInputPrompt(p, pending, nextAmount);
+            }, requiresAdmin: true));
+        }
+
+        state.Options.Add(new RezRankMenuOption(
+            $"Подтвердить: {amount.ToString(CultureInfo.InvariantCulture)} XP",
+            p =>
+            {
+                if (!IsRankAdmin(p))
+                {
+                    CloseRankMenu(p);
+                    return;
+                }
+
+                _ = ApplyAdminXpAmountAsync(
+                    p,
+                    pending,
+                    amount,
+                    _shutdown?.Token ?? CancellationToken.None);
+                OpenAdminMenu(p);
+            },
+            requiresAdmin: true));
+
         state.Options.Add(new RezRankMenuOption("Назад", p =>
         {
-            _pendingAdminXp.Remove(p.SteamID.ToString());
             OpenAdminXpAmountSelection(p, pending);
         }, requiresAdmin: true));
 
