@@ -63,6 +63,8 @@ public sealed class RezRankPlugin : BasePlugin
 
             if (_config.RankProgression.XpPerKill < 0)
                 throw new InvalidOperationException("RankProgression.XpPerKill cannot be negative.");
+            if (_config.RankProgression.XpLossPerDeath < 0)
+                throw new InvalidOperationException("RankProgression.XpLossPerDeath cannot be negative.");
 
             if (_config.Achievements.DoubleKillXp < 0 ||
                 _config.Achievements.TripleKillXp < 0 ||
@@ -155,6 +157,10 @@ public sealed class RezRankPlugin : BasePlugin
                 var attackerSteamId = hasValidEnemyAttacker ? attacker!.SteamID.ToString() : string.Empty;
                 var attackerName = hasValidEnemyAttacker ? attacker!.PlayerName : string.Empty;
                 var attackerIsBypass = hasValidEnemyAttacker && IsBypass(attackerSteamId);
+                var attackerIsRankAdmin = hasValidEnemyAttacker && IsRankAdmin(attacker!);
+                var victimXpPenalty = hasValidEnemyAttacker && !attackerIsRankAdmin
+                    ? _config!.RankProgression.XpLossPerDeath
+                    : 0;
                 var victimIsBypass = IsBypass(victimSteamId);
 
                 // Defer processing by one frame so player_disconnect can mark
@@ -178,8 +184,8 @@ public sealed class RezRankPlugin : BasePlugin
 
                     if (!hasValidEnemyAttacker)
                     {
-                        // World damage, falls, suicides, disconnects, bots and
-                        // non-enemy deaths do not affect player rank statistics.
+                        // Count environmental deaths and suicides, but never penalize XP.
+                        _ = RecordDeathAsync(victimSteamId, victimName, cancellationToken);
                         return;
                     }
 
@@ -219,6 +225,7 @@ public sealed class RezRankPlugin : BasePlugin
                         victimSteamId,
                         victimName,
                         victimIsBypass ? 20 : _config.RankProgression.XpPerKill,
+                        victimXpPenalty,
                         attackerIsBypass,
                         achievementName,
                         achievementXp,
@@ -834,6 +841,7 @@ public sealed class RezRankPlugin : BasePlugin
         string victimSteamId,
         string victimName,
         int xpReward,
+        int victimXpPenalty,
         bool attackerIsBypass,
         string? achievementName,
         int achievementXp,
@@ -855,6 +863,39 @@ public sealed class RezRankPlugin : BasePlugin
                 cancellationToken);
 
             UpdateOnlineTabRank(attackerSteamId, result.CurrentXp);
+
+            if (victimXpPenalty > 0)
+            {
+                var victimResult = await _database.AdjustPlayerXpAsync(
+                    victimSteamId,
+                    victimName,
+                    -victimXpPenalty,
+                    cancellationToken);
+                var actualXpLost = victimResult.PreviousXp - victimResult.CurrentXp;
+                UpdateOnlineTabRank(victimSteamId, victimResult.CurrentXp);
+
+                if (actualXpLost > 0)
+                {
+                    Server.NextFrame(() =>
+                    {
+                        var victim = Utilities.GetPlayers().FirstOrDefault(candidate =>
+                            candidate.IsValid &&
+                            !candidate.IsBot &&
+                            !candidate.IsHLTV &&
+                            candidate.SteamID.ToString() == victimSteamId);
+                        victim?.PrintToChat(FormatChat(
+                            "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {WHITE}За смерть от игрока снято {RED}-%XP% XP{WHITE}. Осталось: {YELLOW}%TOTAL% XP",
+                            ("%XP%", actualXpLost.ToString()),
+                            ("%TOTAL%", victimResult.CurrentXp.ToString())));
+                    });
+                }
+
+                Logger.LogInformation(
+                    "RezRank: {PlayerName} lost {XpLost} XP for being killed by an ordinary enemy player ({Xp} XP remain).",
+                    victimName,
+                    actualXpLost,
+                    victimResult.CurrentXp);
+            }
 
             if (attackerIsBypass)
                 return;
