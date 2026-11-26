@@ -48,6 +48,11 @@ public sealed class RezRankPlugin : BasePlugin
             var configPath = Path.Combine(ModuleDirectory, "config.json");
             _config = RezRankConfig.Load(configPath);
 
+            // The public !rank menu must work even when MySQL is disabled.
+            // Register its tick handler before any database-related early return
+            // so the menu remains visible and its navigation keys are processed.
+            RegisterListener<Listeners.OnTick>(OnRankMenuTick);
+
             if (!_config.Database.Enabled)
             {
                 Logger.LogInformation("RezRank: MySQL is disabled in config.");
@@ -80,7 +85,6 @@ public sealed class RezRankPlugin : BasePlugin
             _database = new RezRankDatabase(_config.Database);
             _databaseReadyTask = InitializeDatabaseAsync(cancellationToken);
 
-            RegisterListener<Listeners.OnTick>(OnRankMenuTick);
             RegisterListener<Listeners.OnTick>(OnCompetitiveRankTick);
 
             // EventPlayerConnectFull is not raised again for players already online
