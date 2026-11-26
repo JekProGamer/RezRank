@@ -82,7 +82,7 @@ public sealed class BypassConfig
 public sealed class RankProgressionConfig
 {
     public int XpPerKill { get; set; } = 5;
-    public int XpLossPerDeath { get; set; } = 7;
+    public int XpLossPerDeath { get; set; } = 6;
 
     public List<RankDefinition> Ranks { get; set; } = new()
     {
@@ -117,10 +117,10 @@ public sealed class RankDefinition
 public sealed class KillStreakAchievementsConfig
 {
     public bool Enabled { get; set; } = true;
-    public int DoubleKillXp { get; set; } = 2;
-    public int TripleKillXp { get; set; } = 4;
-    public int QuadKillXp { get; set; } = 6;
-    public int AceXp { get; set; } = 10;
+    public int DoubleKillXp { get; set; } = 10;
+    public int TripleKillXp { get; set; } = 20;
+    public int QuadKillXp { get; set; } = 30;
+    public int AceXp { get; set; } = 50;
     public string Message { get; set; } =
         "{SILVER}[{ORANGE}R{RED}Rank{SILVER}] {GOLD}%ACHIEVEMENT%! {GREEN}+%XP% XP";
 }
