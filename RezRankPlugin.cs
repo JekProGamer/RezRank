@@ -819,10 +819,10 @@ public sealed class RezRankPlugin : BasePlugin
             .OrderBy(rank => rank.MinXp)
             .ToList();
         var rankIndex = isBypass
-            ? 17
-            : orderedRanks.TakeWhile(rank => rank.MinXp <= xp).Count() - 1;
+            ? 18
+            : orderedRanks.TakeWhile(rank => rank.MinXp <= xp).Count();
         var configuredRank = orderedRanks.LastOrDefault(rank => rank.MinXp <= xp);
-        var competitiveRanking = Math.Clamp(rankIndex, 0, 17);
+        var competitiveRanking = Math.Clamp(rankIndex, 1, 18);
 
         Logger.LogInformation(
             "RezRank: TAB rank calculation for {SteamId}: XP={Xp}; Bypass={IsBypass}; configured rank={ConfiguredRank} (MinXp={MinXp}); rankIndex={RankIndex}; CompetitiveRanking={CompetitiveRanking}.",
@@ -834,7 +834,7 @@ public sealed class RezRankPlugin : BasePlugin
             rankIndex,
             competitiveRanking);
 
-        // Cache the desired standard CS2 competitive rank (Silver I = 0, Global Elite = 17).
+        // Cache the standard CS2 competitive rank (Silver I = 1, Global Elite = 18).
         // Apply it to the live controller immediately on the next game frame instead of
         // waiting for the periodic tick listener. The tick listener remains as a safety net.
         Server.NextFrame(() =>
