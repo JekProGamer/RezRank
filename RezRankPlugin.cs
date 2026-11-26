@@ -1358,6 +1358,9 @@ public sealed class RezRankPlugin : BasePlugin
                     !candidate.IsHLTV &&
                     candidate.SteamID.ToString() == targetSteamId);
 
+                if (target != null && result.CurrentXp > result.PreviousXp)
+                    PlayRankUpSound(target);
+
                 target?.PrintToChat(FormatChat(
                     "{SILVER}[{ORANGE}RezRank{SILVER}] {WHITE}Администратор установил вам звание {BLUE}%RANK%{WHITE}. Ваш опыт: {YELLOW}%XP% XP.",
                     ("%RANK%", rank.Name),
