@@ -110,17 +110,30 @@ public sealed class RezRankPlugin : BasePlugin
             RegisterListener<Listeners.OnTick>(OnCompetitiveRankTick);
 
             // EventPlayerConnectFull is not raised again for players already online
-            // when the plugin is loaded or hot-reloaded. Seed their TAB ranks too.
-            foreach (var onlinePlayer in Utilities.GetPlayers())
+            // when the plugin is loaded or hot-reloaded. Defer the initial TAB-rank
+            // refresh until the next game frame: global game variables may not be
+            // initialized yet while BasePlugin.Load() is executing.
+            Server.NextFrame(() =>
             {
-                if (!onlinePlayer.IsValid || onlinePlayer.IsBot || onlinePlayer.IsHLTV)
-                    continue;
+                try
+                {
+                    foreach (var onlinePlayer in Utilities.GetPlayers())
+                    {
+                        if (!onlinePlayer.IsValid || onlinePlayer.IsBot || onlinePlayer.IsHLTV)
+                            continue;
 
-                _ = RefreshTabRankAfterConnectAsync(
-                    onlinePlayer.SteamID.ToString(),
-                    onlinePlayer.PlayerName,
-                    cancellationToken);
-            }
+                        _ = RefreshTabRankAfterConnectAsync(
+                            onlinePlayer.SteamID.ToString(),
+                            onlinePlayer.PlayerName,
+                            cancellationToken);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Logger.LogError(exception,
+                        "RezRank: failed to initialize TAB ranks for players already online.");
+                }
+            });
             Logger.LogInformation("RezRank: internal AdminPlus-style menu enabled; players can open it with !rank.");
 
             if (_config.DatabaseCleanup.Enabled)
